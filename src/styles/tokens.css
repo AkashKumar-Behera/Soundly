@@ -1,0 +1,42 @@
+:root {
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --accent: #1ed760;
+  --accent-ink: #04130a;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --player-h: 88px;
+  --sidebar-w: 288px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #050506;
+  --panel: #121214;
+  --panel-2: #1b1b1f;
+  --hover: #26262b;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --line: rgb(255 255 255 / 0.08);
+  --shadow: 0 12px 40px rgb(0 0 0 / 0.45);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #eceef0;
+  --panel: #ffffff;
+  --panel-2: #f3f4f6;
+  --hover: #e6e8eb;
+  --text: #111113;
+  --muted: #62626b;
+  --line: rgb(0 0 0 / 0.09);
+  --shadow: 0 12px 40px rgb(0 0 0 / 0.12);
+  --accent: #12a150;
+  --accent-ink: #ffffff;
+}
+
+/* "Blend" UI style: softer, rounder, more Apple-Music like */
+:root[data-ui='blend'] {
+  --radius: 20px;
+  --radius-lg: 26px;
+}
