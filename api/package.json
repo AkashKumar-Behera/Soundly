@@ -1,0 +1,24 @@
+{
+  "name": "soundly-api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "wrangler d1 migrations apply soundly --local",
+    "db:seed": "wrangler d1 execute soundly --local --file=./seed.sql",
+    "db:migrate:remote": "wrangler d1 migrations apply soundly --remote",
+    "deploy": "wrangler deploy --var DEV_AUTH:false",
+    "db:reset": "node --input-type=module -e \"import fs from 'node:fs'; fs.rmSync('.wrangler/state',{recursive:true,force:true})\" && npm run db:migrate && npm run db:seed",
+    "db:seed-sql": "python scripts/gen-seed.py"
+  },
+  "dependencies": {
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261022.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.152.0"
+  }
+}
