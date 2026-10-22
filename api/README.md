@@ -57,13 +57,26 @@ pending_approval -> queued -> downloading -> uploading -> done
         \-> rejected              \-> back to queued (up to 3 attempts) -> failed -> admin retry
 ```
 
-## Deploy (when you are ready)
+## Deployed
+
+Live Worker: `https://soundly-api.akashkumar48874.workers.dev` (Cloudflare account akashkumar48874).
+
+| Resource | Name |
+|---|---|
+| Worker | `soundly-api` |
+| D1 database | `soundly` (schema applied, only the owner account and settings seeded: `seed.prod.sql`) |
+| R2 bucket | `soundly-songs` |
+| Secret | `AGENT_TOKEN` (also saved locally in `.prod-agent-token`, which is gitignored) |
+
+Production runs with `DEV_AUTH=false`, so user routes answer 401 until Phase 3 adds sign-in. The agent routes work
+with the bearer token. Existing buckets in the account (`r2bucket`, `saajcraft`) are not used.
+
+Redeploy after changes:
 
 ```bash
-npx wrangler login
-npx wrangler d1 create soundly            # copy the database_id into wrangler.jsonc
-npx wrangler r2 bucket create soundly-songs
-npm run db:migrate:remote
-npx wrangler secret put AGENT_TOKEN
-npm run deploy
+npm run deploy                         # forces DEV_AUTH=false
+npm run db:migrate:remote              # when you add a migration
+npx wrangler d1 execute soundly --remote --file=./seed.prod.sql
 ```
+
+Set `ALLOWED_ORIGIN` (wrangler.jsonc `vars`) to the frontend's real origin once it is hosted.

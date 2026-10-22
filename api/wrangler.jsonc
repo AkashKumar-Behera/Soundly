@@ -2,9 +2,9 @@
   "name": "soundly-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-01",
-  // Local dev uses wrangler's built-in D1/R2 simulation. Replace database_id after `wrangler d1 create soundly`.
+  // Local dev uses wrangler's built-in D1/R2 simulation; `wrangler deploy` uses the real database and bucket below.
   "d1_databases": [
-    { "binding": "DB", "database_name": "soundly", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "soundly", "database_id": "0d949f2e-2cea-4e70-bec2-737692ff3166", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [{ "binding": "SONGS", "bucket_name": "soundly-songs" }],
   "vars": {
