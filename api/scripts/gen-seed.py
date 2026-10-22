@@ -33,7 +33,8 @@ out = [
     'INSERT INTO users (id, email, name, role, can_request_direct, daily_request_limit) VALUES',
     "  ('u_admin', 'akashkumar48874@gmail.com', 'Akash', 'admin', 1, 50),",
     "  ('u_member', 'member@example.com', 'Demo Member', 'member', 0, 3),",
-    "  ('u_trusted', 'trusted@example.com', 'Demo Trusted', 'trusted', 1, 10);",
+    "  ('u_trusted', 'trusted@example.com', 'Demo Trusted', 'trusted', 1, 10),",
+    "  ('u_listener', 'listener@example.com', 'Demo Listener', 'listener', 0, 0);",
     "INSERT INTO settings (key, value) VALUES ('max_users', '30'), ('max_playlist_import', '50'), "
     "('max_duration_sec', '1200'), ('agent_online_window_sec', '90');",
     'INSERT INTO artists (id, name) VALUES ' + ', '.join(f'({q(aid[a])}, {q(a)})' for a in artists) + ';',

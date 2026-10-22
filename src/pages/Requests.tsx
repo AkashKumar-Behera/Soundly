@@ -1,45 +1,69 @@
 import { Check, X } from 'lucide-react'
+import { useEffect } from 'react'
 import { Cover } from '../components/Cover'
-import { useApp } from '../store/app'
-import type { RequestStatus } from '../store/app'
+import { hueFromId, useLibrary, useRole } from '../store/library'
+import type { RequestStatus } from '../store/library'
 
 const label: Record<RequestStatus, string> = {
   pending_approval: 'Pending approval',
   queued: 'Queued',
   downloading: 'Downloading',
+  uploading: 'Uploading',
   done: 'Ready',
+  failed: 'Failed',
   rejected: 'Rejected',
 }
 
+const flagText: Record<string, string> = { not_music: 'Not music?', too_long: 'Very long' }
+
 export function Requests() {
-  const requests = useApp((s) => s.requests)
-  const role = useApp((s) => s.role)
-  const setStatus = useApp((s) => s.setRequestStatus)
+  const requests = useLibrary((s) => s.requests)
+  const mode = useLibrary((s) => s.mode)
+  const loadRequests = useLibrary((s) => s.loadRequests)
+  const decide = useLibrary((s) => s.decideRequest)
+  const role = useRole()
+
+  // Keep statuses fresh while the page is open (downloads progress on the laptop).
+  useEffect(() => {
+    void loadRequests()
+    if (mode !== 'api') return
+    const t = setInterval(() => void loadRequests(), 5000)
+    return () => clearInterval(t)
+  }, [loadRequests, mode])
 
   return (
     <>
       <h1 className="page-title">Requests</h1>
       <p className="muted lead">
-        Songs you asked for from YouTube. {role === 'admin' ? 'As admin you can approve or reject them here.' : 'An admin approves them before the home server downloads them.'}
+        {role === 'admin'
+          ? 'Everyone’s requests. Approve or reject the ones waiting for you.'
+          : 'Songs you asked for from YouTube. An admin approves them before the home server downloads them.'}
       </p>
 
       {!requests.length && <p className="muted empty">No requests yet. Search for a song that is not in your library and tap “Request song”.</p>}
 
       <div className="yt-list">
-        {requests.map((r, i) => (
+        {requests.map((r) => (
           <div key={r.id} className="yt-item">
-            <Cover hue={(i * 70 + 20) % 360} size={56} className="r8" />
+            <Cover hue={hueFromId(r.youtubeId)} size={56} className="r8" />
             <div className="min0">
               <div className="truncate yt-t">{r.title}</div>
-              <div className="truncate muted">{r.channel}</div>
+              <div className="truncate muted">
+                {[r.userName, r.channel, r.rejectReason].filter(Boolean).join(' · ')}
+                {r.flags.map((f) => (
+                  <span key={f} className="flag">
+                    {flagText[f] ?? f}
+                  </span>
+                ))}
+              </div>
             </div>
             <span className={`status ${r.status}`}>{label[r.status]}</span>
             {role === 'admin' && r.status === 'pending_approval' && (
               <div className="admin-actions">
-                <button className="icon-btn ok" aria-label="Approve" onClick={() => setStatus(r.id, 'queued')}>
+                <button className="icon-btn ok" aria-label="Approve" onClick={() => void decide(r.id, 'approve')}>
                   <Check size={18} />
                 </button>
-                <button className="icon-btn bad" aria-label="Reject" onClick={() => setStatus(r.id, 'rejected')}>
+                <button className="icon-btn bad" aria-label="Reject" onClick={() => void decide(r.id, 'reject')}>
                   <X size={18} />
                 </button>
               </div>

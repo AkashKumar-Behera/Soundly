@@ -1,8 +1,24 @@
+import { getDevUser, setDevUser } from '../api/client'
 import { Segmented } from '../components/Segmented'
 import { useApp } from '../store/app'
+import { useLibrary } from '../store/library'
+import type { Role } from '../store/library'
+
+// Seeded users in the local API (see api/seed.sql). Phase 3 removes this switcher.
+const DEV_USERS = [
+  { value: 'akashkumar48874@gmail.com', label: 'Admin' },
+  { value: 'trusted@example.com', label: 'Trusted' },
+  { value: 'member@example.com', label: 'Member' },
+  { value: 'listener@example.com', label: 'Listener' },
+]
 
 export function Settings() {
-  const { theme, ui, playerStyle, role, setTheme, setUi, setPlayerStyle, setRole } = useApp()
+  const { theme, ui, playerStyle, setTheme, setUi, setPlayerStyle } = useApp()
+  const mode = useLibrary((s) => s.mode)
+  const me = useLibrary((s) => s.me)
+  const demoRole = useLibrary((s) => s.demoRole)
+  const setDemoRole = useLibrary((s) => s.setDemoRole)
+  const load = useLibrary((s) => s.load)
 
   return (
     <>
@@ -55,22 +71,41 @@ export function Settings() {
         />
       </section>
 
-      <section className="setting">
-        <div>
-          <h3>Demo role</h3>
-          <p className="muted">Preview what each role sees. Real roles come from the backend.</p>
-        </div>
-        <Segmented
-          value={role}
-          onChange={setRole}
-          options={[
-            { value: 'listener', label: 'Listener' },
-            { value: 'member', label: 'Member' },
-            { value: 'trusted', label: 'Trusted' },
-            { value: 'admin', label: 'Admin' },
-          ]}
-        />
-      </section>
+      {mode === 'api' ? (
+        <section className="setting">
+          <div>
+            <h3>Dev user</h3>
+            <p className="muted">
+              Signed in as {me?.name} ({me?.role}). Local development only: pick a seeded user to see what each role gets. Real sign-in arrives later.
+            </p>
+          </div>
+          <Segmented
+            value={getDevUser() ?? DEV_USERS[0].value}
+            onChange={(email) => {
+              setDevUser(email)
+              void load()
+            }}
+            options={DEV_USERS}
+          />
+        </section>
+      ) : (
+        <section className="setting">
+          <div>
+            <h3>Demo role</h3>
+            <p className="muted">The API is not reachable, so this runs on demo data. Preview what each role sees.</p>
+          </div>
+          <Segmented<Role>
+            value={demoRole}
+            onChange={setDemoRole}
+            options={[
+              { value: 'listener', label: 'Listener' },
+              { value: 'member', label: 'Member' },
+              { value: 'trusted', label: 'Trusted' },
+              { value: 'admin', label: 'Admin' },
+            ]}
+          />
+        </section>
+      )}
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { Heart, ListMusic, Maximize2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
-import { useApp } from '../store/app'
+import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
 import { Cover } from './Cover'
@@ -12,8 +12,8 @@ export function PlayerBar() {
   const repeat = usePlayer((s) => s.repeat)
   const volume = usePlayer((s) => s.volume)
   const { toggle, next, prev, toggleShuffle, cycleRepeat, setVolume } = usePlayer.getState()
-  const liked = useApp((s) => (song ? s.liked.includes(song.id) : false))
-  const toggleLike = useApp((s) => s.toggleLike)
+  const liked = useLibrary((s) => (song ? s.liked.includes(song.id) : false))
+  const toggleLike = useLibrary((s) => s.toggleLike)
   const setNowPlaying = useUi((s) => s.setNowPlaying)
   const disabled = !song
 
@@ -23,7 +23,7 @@ export function PlayerBar() {
         {song ? (
           <>
             <button className="pb-art" aria-label="Open now playing" onClick={() => setNowPlaying(true)}>
-              <Cover hue={song.hue} hue2={song.hue2} className="r8" />
+              <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} className="r8" />
             </button>
             <div className="min0">
               <div className="pb-title truncate">{song.title}</div>

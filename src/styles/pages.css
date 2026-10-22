@@ -277,3 +277,18 @@
 .google-btn:hover {
   transform: scale(1.02);
 }
+
+.boot {
+  height: 100dvh;
+  background: var(--bg);
+}
+
+.flag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgb(255 184 0 / 0.18);
+  color: #ffb800;
+}

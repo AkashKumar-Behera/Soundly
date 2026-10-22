@@ -1,58 +1,65 @@
 import { Heart, Pause, Play, Shuffle } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Cover } from '../components/Cover'
 import { SongRow } from '../components/SongRow'
-import { playlists, songById } from '../data/mock'
 import type { Song } from '../data/mock'
-import { useApp } from '../store/app'
-import { useCurrent, usePlayer } from '../store/player'
+import { useLibrary } from '../store/library'
+import type { Playlist as PlaylistInfo } from '../store/library'
+import { usePlayer } from '../store/player'
 
 export function Playlist() {
-  const { id } = useParams()
-  const likedIds = useApp((s) => s.liked)
-  const current = useCurrent()
+  const { id = '' } = useParams()
+  const getPlaylist = useLibrary((s) => s.getPlaylist)
+  const likedIds = useLibrary((s) => s.liked)
   const playing = usePlayer((s) => s.playing)
+  const sourceId = usePlayer((s) => s.sourceId)
   const playQueue = usePlayer((s) => s.playQueue)
   const toggle = usePlayer((s) => s.toggle)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
 
+  const [data, setData] = useState<{ playlist: PlaylistInfo; songs: Song[] } | null | undefined>(undefined)
   const isLiked = id === 'liked'
-  const pl = playlists.find((p) => p.id === id)
-  if (!isLiked && !pl) return <p className="muted empty">Playlist not found.</p>
 
-  const ids = isLiked ? likedIds : (pl?.songIds ?? [])
-  const list = ids.map(songById).filter((s): s is Song => !!s)
+  // Reload when the id changes, and for "liked" whenever a heart is toggled.
+  useEffect(() => {
+    let live = true
+    void getPlaylist(id).then((d) => live && setData(d))
+    return () => {
+      live = false
+    }
+  }, [id, getPlaylist, isLiked ? likedIds : null])
+
+  if (data === undefined) return <p className="muted empty">Loading…</p>
+  if (data === null) return <p className="muted empty">Playlist not found.</p>
+
+  const { playlist: pl, songs: list } = data
   const total = list.reduce((n, s) => n + s.duration, 0)
-  const hue = pl?.hue ?? 150
-  const here = !!current && list.some((s) => s.id === current.id)
+  const here = sourceId === id
+  const play = () => (here ? toggle() : playQueue(list, 0, id))
 
   return (
     <>
-      <div className="pl-head" style={{ '--hue': hue } as React.CSSProperties}>
+      <div className="pl-head">
         {isLiked ? (
           <div className="liked-art pl-art">
             <Heart size={84} fill="currentColor" />
           </div>
         ) : (
-          <Cover hue={hue} className="pl-art" />
+          <Cover hue={pl.hue} className="pl-art" />
         )}
         <div className="pl-info">
           <span className="eyebrow">Playlist</span>
-          <h1>{isLiked ? 'Liked Songs' : pl?.title}</h1>
-          <p className="muted">{isLiked ? 'Songs you hearted.' : pl?.description}</p>
+          <h1>{pl.title}</h1>
+          <p className="muted">{pl.description}</p>
           <p className="pl-stats">
-            <b>Soundly</b> · {list.length} songs, {Math.round(total / 60)} min
+            <b>Soundly</b> · {list.length} songs{total ? `, ${Math.round(total / 60)} min` : ''}
           </p>
         </div>
       </div>
 
       <div className="pl-actions">
-        <button
-          className="play-btn xl"
-          aria-label={here && playing ? 'Pause' : 'Play'}
-          onClick={() => (here ? toggle() : playQueue(list, 0))}
-          disabled={!list.length}
-        >
+        <button className="play-btn xl" aria-label={here && playing ? 'Pause' : 'Play'} onClick={play} disabled={!list.length}>
           {here && playing ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" />}
         </button>
         <button
@@ -61,7 +68,7 @@ export function Playlist() {
           disabled={!list.length}
           onClick={() => {
             toggleShuffle()
-            playQueue(list, Math.floor(Math.random() * list.length))
+            playQueue(list, Math.floor(Math.random() * list.length), id)
           }}
         >
           <Shuffle size={28} />
@@ -77,7 +84,7 @@ export function Playlist() {
           <span>Time</span>
         </div>
         {list.map((s, i) => (
-          <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(list, i)} />
+          <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(list, i, id)} />
         ))}
         {!list.length && <p className="muted empty">Nothing here yet.</p>}
       </div>

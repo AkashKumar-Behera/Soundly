@@ -1,7 +1,6 @@
 import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { playlists } from '../data/mock'
-import { useApp } from '../store/app'
+import { useLibrary, useRole } from '../store/library'
 import { Cover } from './Cover'
 import { Logo } from './Logo'
 
@@ -14,8 +13,11 @@ const nav = [
 
 export function Sidebar() {
   const navigate = useNavigate()
-  const likedCount = useApp((s) => s.liked.length)
-  const role = useApp((s) => s.role)
+  const likedCount = useLibrary((s) => s.liked.length)
+  const playlists = useLibrary((s) => s.playlists)
+  const isPro = useLibrary((s) => !!s.me?.isPro)
+  const role = useRole()
+  const name = useLibrary((s) => s.me?.name ?? 'Akash')
 
   return (
     <aside className="sidebar">
@@ -58,7 +60,7 @@ export function Sidebar() {
             <Cover hue={p.hue} size={48} className="r8" />
             <div className="min0">
               <div className="truncate">{p.title}</div>
-              <div className="sub truncate">Playlist · Soundly</div>
+              <div className="sub truncate">Playlist · {p.songCount} songs</div>
             </div>
           </NavLink>
         ))}
@@ -67,10 +69,10 @@ export function Sidebar() {
       <div className="sb-foot">
         <div className="avatar">A</div>
         <div className="min0">
-          <div className="truncate">Akash</div>
+          <div className="truncate">{name}</div>
           <div className="sub truncate">{role}</div>
         </div>
-        {(role === 'trusted' || role === 'admin') && (
+        {(isPro || role === 'trusted' || role === 'admin') && (
           <span className="pro">
             <Crown size={12} /> PRO
           </span>

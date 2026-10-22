@@ -5,6 +5,7 @@ import { Cover } from './Cover'
 interface Props {
   hue: number
   hue2?: number
+  thumbUrl?: string
   title: string
   subtitle: string
   onOpen: () => void
@@ -13,7 +14,7 @@ interface Props {
   round?: boolean
 }
 
-export function Card({ hue, hue2, title, subtitle, onOpen, onPlay, playing, round }: Props) {
+export function Card({ hue, hue2, thumbUrl, title, subtitle, onOpen, onPlay, playing, round }: Props) {
   const play = (e: MouseEvent) => {
     e.stopPropagation()
     onPlay()
@@ -27,7 +28,7 @@ export function Card({ hue, hue2, title, subtitle, onOpen, onPlay, playing, roun
       onKeyDown={(e) => e.key === 'Enter' && onOpen()}
     >
       <div className="card-art">
-        <Cover hue={hue} hue2={hue2} round={round} />
+        <Cover hue={hue} hue2={hue2} thumbUrl={thumbUrl} round={round} />
         <button className="fab" aria-label={`${playing ? 'Pause' : 'Play'} ${title}`} onClick={play}>
           {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
         </button>

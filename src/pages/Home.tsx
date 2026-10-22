@@ -2,27 +2,24 @@ import { Pause, Play } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Shelf } from '../components/Card'
 import { Cover } from '../components/Cover'
-import { playlists, songById, songs } from '../data/mock'
-import type { Playlist, Song } from '../data/mock'
 import { greeting } from '../lib/format'
-import { useApp } from '../store/app'
+import { playPlaylist } from '../lib/playlist'
+import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
-
-function listFor(p: Playlist): Song[] {
-  return p.songIds.map(songById).filter((s): s is Song => !!s)
-}
 
 export function Home() {
   const navigate = useNavigate()
   const current = useCurrent()
   const playing = usePlayer((s) => s.playing)
+  const sourceId = usePlayer((s) => s.sourceId)
   const playQueue = usePlayer((s) => s.playQueue)
   const toggle = usePlayer((s) => s.toggle)
-  const likedIds = useApp((s) => s.liked)
+  const songs = useLibrary((s) => s.songs)
+  const playlists = useLibrary((s) => s.playlists)
+  const recent = useLibrary((s) => s.recent)
+  const likedCount = useLibrary((s) => s.liked.length)
 
-  const likedSongs = likedIds.map(songById).filter((s): s is Song => !!s)
-  const playPlaylist = (p: Playlist) => playQueue(listFor(p), 0)
-  const isPlaylistPlaying = (p: Playlist) => !!current && playing && p.songIds.includes(current.id)
+  const playlistPlaying = (id: string) => playing && sourceId === id
 
   return (
     <>
@@ -38,10 +35,10 @@ export function Home() {
             aria-label="Play liked songs"
             onClick={(e) => {
               e.stopPropagation()
-              playQueue(likedSongs, 0)
+              void playPlaylist('liked')
             }}
           >
-            <Play size={20} fill="currentColor" />
+            {playlistPlaying('liked') ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
           </span>
         </button>
         {playlists.slice(0, 5).map((p) => (
@@ -54,61 +51,68 @@ export function Home() {
               aria-label={`Play ${p.title}`}
               onClick={(e) => {
                 e.stopPropagation()
-                playPlaylist(p)
+                void playPlaylist(p.id)
               }}
             >
-              {isPlaylistPlaying(p) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+              {playlistPlaying(p.id) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
             </span>
           </button>
         ))}
       </div>
 
-      <Shelf title="Made for you">
-        {playlists.map((p) => (
-          <Card
-            key={p.id}
-            hue={p.hue}
-            title={p.title}
-            subtitle={p.description}
-            playing={isPlaylistPlaying(p)}
-            onOpen={() => navigate(`/playlist/${p.id}`)}
-            onPlay={() => (isPlaylistPlaying(p) ? toggle() : playPlaylist(p))}
-          />
-        ))}
-      </Shelf>
+      {likedCount === 0 && !songs.length && <p className="muted empty">Your library is empty. Search for a song and request it from YouTube.</p>}
 
-      <Shelf title="Top songs this month">
-        {songs.slice(0, 8).map((s, i) => (
-          <Card
-            key={s.id}
-            hue={s.hue}
-            hue2={s.hue2}
-            title={s.title}
-            subtitle={s.artist}
-            playing={current?.id === s.id && playing}
-            onOpen={() => playQueue(songs, i)}
-            onPlay={() => (current?.id === s.id ? toggle() : playQueue(songs, i))}
-          />
-        ))}
-      </Shelf>
-
-      <Shelf title="New in your library">
-        {songs
-          .slice(8)
-          .concat(songs.slice(0, 2))
-          .map((s) => (
+      {recent.length > 0 && (
+        <Shelf title="Recently played">
+          {recent.map((s, i) => (
             <Card
               key={s.id}
               hue={s.hue}
               hue2={s.hue2}
+              thumbUrl={s.thumbUrl}
               title={s.title}
-              subtitle={`${s.artist} · ${s.album}`}
+              subtitle={s.artist}
               playing={current?.id === s.id && playing}
-              onOpen={() => playQueue([s], 0)}
-              onPlay={() => (current?.id === s.id ? toggle() : playQueue([s], 0))}
+              onOpen={() => playQueue(recent, i)}
+              onPlay={() => (current?.id === s.id ? toggle() : playQueue(recent, i))}
             />
           ))}
-      </Shelf>
+        </Shelf>
+      )}
+
+      {playlists.length > 0 && (
+        <Shelf title="Made for you">
+          {playlists.map((p) => (
+            <Card
+              key={p.id}
+              hue={p.hue}
+              title={p.title}
+              subtitle={p.description}
+              playing={playlistPlaying(p.id)}
+              onOpen={() => navigate(`/playlist/${p.id}`)}
+              onPlay={() => (playlistPlaying(p.id) ? toggle() : void playPlaylist(p.id))}
+            />
+          ))}
+        </Shelf>
+      )}
+
+      {songs.length > 0 && (
+        <Shelf title="Recently added">
+          {songs.slice(0, 12).map((s, i) => (
+            <Card
+              key={s.id}
+              hue={s.hue}
+              hue2={s.hue2}
+              thumbUrl={s.thumbUrl}
+              title={s.title}
+              subtitle={s.artist}
+              playing={current?.id === s.id && playing}
+              onOpen={() => playQueue(songs, i)}
+              onPlay={() => (current?.id === s.id ? toggle() : playQueue(songs, i))}
+            />
+          ))}
+        </Shelf>
+      )}
     </>
   )
 }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { logPlay } from '../api/client'
 import type { Song } from '../data/mock'
 
 export type Repeat = 'off' | 'all' | 'one'
@@ -6,13 +7,15 @@ export type Repeat = 'off' | 'all' | 'one'
 interface PlayerState {
   queue: Song[]
   index: number
+  /** Where the queue came from (a playlist id), so shelves can show which playlist is playing. */
+  sourceId: string | null
   playing: boolean
   time: number
   duration: number
   volume: number
   shuffle: boolean
   repeat: Repeat
-  playQueue: (songs: Song[], index: number) => void
+  playQueue: (songs: Song[], index: number, sourceId?: string | null) => void
   playAt: (index: number) => void
   toggle: () => void
   next: (auto?: boolean) => void
@@ -30,7 +33,16 @@ const audio = new Audio()
 audio.preload = 'metadata'
 audio.volume = 0.8
 
+// Report a play to the API once a song has been listened to for a while (feeds history and analytics).
+let playing: Song | null = null
+function flushPlay() {
+  if (playing && audio.currentTime >= 15) logPlay(playing.id, Math.floor(audio.currentTime))
+  playing = null
+}
+
 function load(song: Song) {
+  flushPlay()
+  playing = song
   audio.src = song.src
   audio.currentTime = 0
   void audio.play().catch(() => {})
@@ -49,6 +61,7 @@ function setMediaMetadata(song: Song) {
 export const usePlayer = create<PlayerState>((set, get) => ({
   queue: [],
   index: -1,
+  sourceId: null,
   playing: false,
   time: 0,
   duration: 0,
@@ -56,9 +69,9 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   shuffle: false,
   repeat: 'off',
 
-  playQueue: (songs, index) => {
+  playQueue: (songs, index, sourceId = null) => {
     if (!songs.length) return
-    set({ queue: songs, index, time: 0 })
+    set({ queue: songs, index, sourceId, time: 0 })
     load(songs[index])
   },
 
@@ -143,7 +156,11 @@ audio.addEventListener('loadedmetadata', () => usePlayer.setState({ duration: au
 audio.addEventListener('durationchange', () => usePlayer.setState({ duration: audio.duration || 0 }))
 audio.addEventListener('play', () => usePlayer.setState({ playing: true }))
 audio.addEventListener('pause', () => usePlayer.setState({ playing: false }))
-audio.addEventListener('ended', () => usePlayer.getState().next(true))
+audio.addEventListener('ended', () => {
+  if (playing) logPlay(playing.id, Math.floor(audio.duration || 0))
+  playing = null
+  usePlayer.getState().next(true)
+})
 
 if ('mediaSession' in navigator) {
   const ms = navigator.mediaSession

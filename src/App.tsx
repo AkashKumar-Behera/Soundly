@@ -9,6 +9,7 @@ import { Requests } from './pages/Requests'
 import { Search } from './pages/Search'
 import { Settings } from './pages/Settings'
 import { useApp } from './store/app'
+import { useLibrary } from './store/library'
 
 function useTheme() {
   const theme = useApp((s) => s.theme)
@@ -34,6 +35,12 @@ function useTheme() {
 
 export default function App() {
   useTheme()
+  const load = useLibrary((s) => s.load)
+  const status = useLibrary((s) => s.status)
+  useEffect(() => {
+    void load()
+  }, [load])
+  if (status === 'loading') return <div className="boot" aria-busy="true" />
   return (
     <BrowserRouter>
       <Routes>

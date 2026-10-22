@@ -211,6 +211,13 @@
 .cover.r8 {
   border-radius: 8px;
 }
+.cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .cover-bars {
   position: absolute;
   inset: 0;
@@ -696,7 +703,8 @@
   color: #ffb800;
 }
 .status.queued,
-.status.downloading {
+.status.downloading,
+.status.uploading {
   background: rgb(80 160 255 / 0.18);
   color: #5aa7ff;
 }
@@ -704,7 +712,8 @@
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   color: var(--accent);
 }
-.status.rejected {
+.status.rejected,
+.status.failed {
   background: rgb(255 80 80 / 0.18);
   color: #ff6b6b;
 }

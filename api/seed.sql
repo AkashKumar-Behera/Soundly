@@ -3,7 +3,8 @@
 INSERT INTO users (id, email, name, role, can_request_direct, daily_request_limit) VALUES
   ('u_admin', 'akashkumar48874@gmail.com', 'Akash', 'admin', 1, 50),
   ('u_member', 'member@example.com', 'Demo Member', 'member', 0, 3),
-  ('u_trusted', 'trusted@example.com', 'Demo Trusted', 'trusted', 1, 10);
+  ('u_trusted', 'trusted@example.com', 'Demo Trusted', 'trusted', 1, 10),
+  ('u_listener', 'listener@example.com', 'Demo Listener', 'listener', 0, 0);
 INSERT INTO settings (key, value) VALUES ('max_users', '30'), ('max_playlist_import', '50'), ('max_duration_sec', '1200'), ('agent_online_window_sec', '90');
 INSERT INTO artists (id, name) VALUES ('a_1', 'Aria Moon'), ('a_2', 'Kaito Rise'), ('a_3', 'Luna Vale'), ('a_4', 'Mira & The Tides'), ('a_5', 'Neon Harbor'), ('a_6', 'Orbit Kid'), ('a_7', 'Sundial'), ('a_8', 'Velvet Static');
 INSERT INTO songs (id, title, artist_id, album, duration_sec, r2_key, added_by) VALUES

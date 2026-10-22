@@ -11,7 +11,7 @@ A private, invite-only music streaming web app (PWA), inspired by the layout of 
 - Motion for animation, Tailwind CSS (base) plus hand-written design tokens
 - Backend (`api/`): Cloudflare Worker with Hono, D1 (SQLite) and R2, plus a planned home-laptop agent that fetches requested songs
 
-## What works now (Phase 1, mock data)
+## What works now
 
 - Spotify-style shell: sidebar, top search, home shelves, bottom player bar, mobile tabs and mini player
 - Real audio playback with queue, shuffle, repeat, seek, volume and Media Session controls
@@ -19,6 +19,7 @@ A private, invite-only music streaming web app (PWA), inspired by the layout of 
 - Themes: dark, light, system; interface styles: Classic and Blend
 - Search with a "Request song" flow and a Requests page (role aware demo)
 - Login screen (UI only)
+- Connected to the API: songs, streaming, playlists, likes, play history, requests and admin approvals. If the API is not reachable the app falls back to bundled demo data
 
 ## Run
 
@@ -28,7 +29,7 @@ npm run dev            # frontend, http://127.0.0.1:5173
 cd api && npm install && npm run db:reset && npm run dev   # API, http://127.0.0.1:8787
 ```
 
-The frontend still runs on mock data. See [api/README.md](api/README.md) for the API, schema and deploy steps.
+The Vite dev server proxies `/api` to the Worker on port 8787. Without the API the app runs on demo data. See [api/README.md](api/README.md) for the API, schema and deploy steps.
 
 ## Roadmap
 

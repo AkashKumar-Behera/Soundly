@@ -7,6 +7,7 @@ export interface Song {
   hue2: number
   src: string
   duration: number
+  thumbUrl?: string
 }
 
 export interface Playlist {

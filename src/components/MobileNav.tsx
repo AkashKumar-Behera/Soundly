@@ -22,7 +22,7 @@ export function MobileNav() {
     <div className="mobile-nav">
       {song && (
         <div className="mini" onClick={() => setNowPlaying(true)}>
-          <Cover hue={song.hue} hue2={song.hue2} size={40} className="r8" />
+          <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} size={40} className="r8" />
           <div className="min0">
             <div className="truncate mini-title">{song.title}</div>
             <div className="truncate mini-artist">{song.artist}</div>

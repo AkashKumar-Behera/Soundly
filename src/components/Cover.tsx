@@ -6,10 +6,12 @@ interface Props {
   size?: number
   round?: boolean
   className?: string
+  /** Real cover art; the generated gradient stays underneath until it loads. */
+  thumbUrl?: string
 }
 
 /** Generated cover art: a hue-seeded gradient with a faint equalizer motif. */
-export function Cover({ hue, hue2 = hue + 50, size, round, className = '' }: Props) {
+export function Cover({ hue, hue2 = hue + 50, size, round, className = '', thumbUrl }: Props) {
   const style: CSSProperties = {
     background: `radial-gradient(120% 90% at 20% 10%, hsl(${hue} 85% 62%) 0%, transparent 60%), linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${hue2} 75% 26%))`,
     ...(size ? { width: size, height: size } : null),
@@ -17,7 +19,10 @@ export function Cover({ hue, hue2 = hue + 50, size, round, className = '' }: Pro
   }
   return (
     <div className={`cover ${className}`} style={style} aria-hidden="true">
-      <svg viewBox="0 0 100 100" className="cover-bars">
+      {thumbUrl ? (
+        <img src={thumbUrl} alt="" loading="lazy" className="cover-img" />
+      ) : null}
+      <svg viewBox="0 0 100 100" className="cover-bars" style={thumbUrl ? { display: 'none' } : undefined}>
         <g stroke="#fff" strokeWidth="9" strokeLinecap="round" opacity="0.28">
           <line x1="26" y1="42" x2="26" y2="58" />
           <line x1="38" y1="32" x2="38" y2="68" />

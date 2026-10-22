@@ -1,23 +1,35 @@
 import { Heart } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '../components/Card'
 import { SongRow } from '../components/SongRow'
-import { playlists, songById, songs } from '../data/mock'
 import type { Song } from '../data/mock'
-import { useApp } from '../store/app'
-import { useCurrent, usePlayer } from '../store/player'
+import { playPlaylist } from '../lib/playlist'
+import { useLibrary } from '../store/library'
+import { usePlayer } from '../store/player'
 
 type Filter = 'playlists' | 'songs' | 'liked'
 
 export function Library() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>('playlists')
+  const [likedSongs, setLikedSongs] = useState<Song[]>([])
   const playQueue = usePlayer((s) => s.playQueue)
-  const current = useCurrent()
   const playing = usePlayer((s) => s.playing)
-  const likedIds = useApp((s) => s.liked)
-  const liked = likedIds.map(songById).filter((s): s is Song => !!s)
+  const sourceId = usePlayer((s) => s.sourceId)
+  const songs = useLibrary((s) => s.songs)
+  const playlists = useLibrary((s) => s.playlists)
+  const likedIds = useLibrary((s) => s.liked)
+  const getPlaylist = useLibrary((s) => s.getPlaylist)
+
+  useEffect(() => {
+    if (filter !== 'liked') return
+    let live = true
+    void getPlaylist('liked').then((d) => live && setLikedSongs(d?.songs ?? []))
+    return () => {
+      live = false
+    }
+  }, [filter, getPlaylist, likedIds])
 
   return (
     <>
@@ -39,17 +51,17 @@ export function Library() {
               </div>
             </div>
             <div className="card-title">Liked Songs</div>
-            <div className="card-sub">{liked.length} songs</div>
+            <div className="card-sub">{likedIds.length} songs</div>
           </div>
           {playlists.map((p) => (
             <Card
               key={p.id}
               hue={p.hue}
               title={p.title}
-              subtitle={`${p.songIds.length} songs`}
-              playing={!!current && playing && p.songIds.includes(current.id)}
+              subtitle={`${p.songCount} songs`}
+              playing={playing && sourceId === p.id}
               onOpen={() => navigate(`/playlist/${p.id}`)}
-              onPlay={() => playQueue(p.songIds.map(songById).filter((s): s is Song => !!s), 0)}
+              onPlay={() => void playPlaylist(p.id)}
             />
           ))}
         </div>
@@ -57,10 +69,11 @@ export function Library() {
 
       {filter !== 'playlists' && (
         <div className="song-table">
-          {(filter === 'songs' ? songs : liked).map((s, i, arr) => (
-            <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(arr, i)} />
+          {(filter === 'songs' ? songs : likedSongs).map((s, i, arr) => (
+            <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(arr, i, filter === 'liked' ? 'liked' : null)} />
           ))}
-          {filter === 'liked' && !liked.length && <p className="muted empty">Tap the heart on a song to save it here.</p>}
+          {filter === 'liked' && !likedSongs.length && <p className="muted empty">Tap the heart on a song to save it here.</p>}
+          {filter === 'songs' && !songs.length && <p className="muted empty">No songs yet.</p>}
         </div>
       )}
     </>

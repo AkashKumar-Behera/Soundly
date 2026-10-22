@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { lyrics } from '../data/mock'
 import { useApp } from '../store/app'
+import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
 import { Cover } from './Cover'
@@ -47,7 +48,7 @@ function Queue() {
     <div className="np-queue">
       {queue.map((s, i) => (
         <button key={`${s.id}-${i}`} className={i === index ? 'on' : ''} onClick={() => playAt(i)}>
-          <Cover hue={s.hue} hue2={s.hue2} size={40} className="r8" />
+          <Cover hue={s.hue} hue2={s.hue2} thumbUrl={s.thumbUrl} size={40} className="r8" />
           <div className="min0">
             <div className="truncate t">{s.title}</div>
             <div className="truncate a">{s.artist}</div>
@@ -65,8 +66,8 @@ function Content() {
   const repeat = usePlayer((s) => s.repeat)
   const { toggle, next, prev, toggleShuffle, cycleRepeat } = usePlayer.getState()
   const playerStyle = useApp((s) => s.playerStyle)
-  const liked = useApp((s) => (song ? s.liked.includes(song.id) : false))
-  const toggleLike = useApp((s) => s.toggleLike)
+  const liked = useLibrary((s) => (song ? s.liked.includes(song.id) : false))
+  const toggleLike = useLibrary((s) => s.toggleLike)
   const close = useUi((s) => s.setNowPlaying)
   const [tab, setTab] = useState<Tab>('lyrics')
 
@@ -75,11 +76,11 @@ function Content() {
   const art =
     playerStyle === 'vinyl' ? (
       <div className={`vinyl ${playing ? 'spin' : ''}`}>
-        <Cover hue={song.hue} hue2={song.hue2} round className="vinyl-label" />
+        <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} round className="vinyl-label" />
       </div>
     ) : (
       <div className={`np-art ${playerStyle} ${playing ? 'on' : ''}`}>
-        <Cover hue={song.hue} hue2={song.hue2} />
+        <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} />
       </div>
     )
 
