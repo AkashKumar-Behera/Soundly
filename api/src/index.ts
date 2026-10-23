@@ -57,6 +57,12 @@ app.route('/api/agent', agent)
 app.notFound((c) => c.json({ error: 'not_found' }, 404))
 app.onError((err, c) => {
   console.error(err)
+  // D1's free tier stops serving after a day's row reads; it resumes at midnight UTC. Tell the app, so it can say so.
+  if (/D1_ERROR/.test(String(err)) && /free tier|row read|limit/i.test(String(err))) {
+    const now = new Date()
+    const resumeAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString()
+    return c.json({ error: 'maintenance', resumeAt }, 503)
+  }
   return c.json({ error: 'internal_error' }, 500)
 })
 

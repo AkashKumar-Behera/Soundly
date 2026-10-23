@@ -151,7 +151,9 @@ export function toSong(s: ApiSong): Song {
 
 interface LibraryState {
   /** `unauth`: the API is reachable but nobody is signed in. */
-  status: 'loading' | 'ready' | 'unauth' | 'offline'
+  status: 'loading' | 'ready' | 'unauth' | 'offline' | 'maintenance'
+  /** When the server expects to be back (ISO time), if it said so. */
+  resumeAt: string | null
   mode: 'api' | 'demo'
   me: Me | null
   songs: Song[]
@@ -184,6 +186,7 @@ const LIKED_ID = 'liked'
 
 export const useLibrary = create<LibraryState>((set, get) => ({
   status: 'loading',
+  resumeAt: null,
   mode: 'api',
   me: null,
   songs: [],
@@ -222,6 +225,13 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       if (e instanceof ApiError && e.status === 401) {
         setDemo(false)
         set({ status: 'unauth', mode: 'api', me: null, songs: [], playlists: [], liked: [], recent: [], requests: [] })
+        return
+      }
+      // The server answered but is down (503 maintenance, or any 5xx): show a notice, never demo data.
+      // A background reload failing with a one-off 5xx must not throw away a working session.
+      if (e instanceof ApiError && e.status >= 500 && e.code !== 'maintenance' && get().status === 'ready') return
+      if (e instanceof ApiError && (e.code === 'maintenance' || (e.status >= 500 && e.status < 600))) {
+        set({ status: 'maintenance', resumeAt: typeof e.data.resumeAt === 'string' ? e.data.resumeAt : null })
         return
       }
       // No reachable API (static hosting, or the Worker is down): run on bundled demo data.

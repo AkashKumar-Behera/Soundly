@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { Splash } from './components/Splash'
+import { Maintenance, Splash } from './components/Splash'
 import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
 import { Artists } from './pages/Artists'
@@ -43,11 +43,13 @@ export default function App() {
   useTheme()
   const load = useLibrary((s) => s.load)
   const status = useLibrary((s) => s.status)
+  const resumeAt = useLibrary((s) => s.resumeAt)
   useEffect(() => {
     void load()
     void useOffline.getState().init()
   }, [load])
   if (status === 'loading') return <Splash />
+  if (status === 'maintenance') return <Maintenance resumeAt={resumeAt} onRetry={() => void load()} />
   if (status === 'offline') return <Splash offline onRetry={() => void load()} />
   if (status === 'unauth') {
     return (
