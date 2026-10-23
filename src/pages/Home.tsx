@@ -1,4 +1,4 @@
-import { Pause, Play } from 'lucide-react'
+import { Pause, Play, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Shelf } from '../components/Card'
 import { Cover } from '../components/Cover'
@@ -18,12 +18,23 @@ export function Home() {
   const playlists = useLibrary((s) => s.playlists)
   const recent = useLibrary((s) => s.recent)
   const likedCount = useLibrary((s) => s.liked.length)
+  const mode = useLibrary((s) => s.mode)
 
   const playlistPlaying = (id: string) => playing && sourceId === id
 
   return (
     <>
       <h1 className="greet">{greeting()}</h1>
+
+      {mode === 'api' && (
+        <button className="wrapped-cta" onClick={() => navigate('/wrapped')}>
+          <Sparkles size={26} />
+          <div>
+            <strong>Your Soundly Wrapped</strong>
+            <span>See what you listened to most, as a story.</span>
+          </div>
+        </button>
+      )}
 
       <div className="quick">
         <button className="quick-item" onClick={() => navigate('/playlist/liked')}>

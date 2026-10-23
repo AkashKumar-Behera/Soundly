@@ -1,4 +1,4 @@
-import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings, ShieldCheck } from 'lucide-react'
+import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useLibrary, useRole } from '../store/library'
 import { Cover } from './Cover'
@@ -8,6 +8,7 @@ const nav = [
   { to: '/', label: 'Home', icon: House, end: true },
   { to: '/search', label: 'Search', icon: Search },
   { to: '/requests', label: 'Requests', icon: Inbox },
+  { to: '/wrapped', label: 'Wrapped', icon: Sparkles },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

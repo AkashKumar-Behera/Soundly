@@ -8,6 +8,7 @@ import { likes, me, plays } from './routes/library'
 import { playlists } from './routes/playlists'
 import { requests } from './routes/requests'
 import { songs, stream, thumbs } from './routes/songs'
+import { wrapped } from './routes/wrapped'
 import { youtube } from './routes/youtube'
 import type { AppEnv } from './types'
 
@@ -38,6 +39,7 @@ app.route('/api/plays', plays)
 app.route('/api/playlists', playlists)
 app.route('/api/requests', requests)
 app.route('/api/youtube', youtube)
+app.route('/api/wrapped', wrapped)
 app.route('/api/admin', admin)
 app.route('/api/admin', adminManage)
 app.route('/api/agent', agent)

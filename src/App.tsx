@@ -9,6 +9,7 @@ import { Login } from './pages/Login'
 import { Playlist } from './pages/Playlist'
 import { Requests } from './pages/Requests'
 import { Search } from './pages/Search'
+import { Wrapped } from './pages/Wrapped'
 import { Settings } from './pages/Settings'
 import { useApp } from './store/app'
 import { useLibrary } from './store/library'
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="requests" element={<Requests />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="wrapped" element={<Wrapped />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
