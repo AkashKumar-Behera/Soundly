@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -35,9 +36,29 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
+
+def _hide_child_windows() -> None:
+    """On Windows every helper process (netsh, ffmpeg, yt-dlp's ffmpeg) would flash a console window. Hide them all."""
+    if os.name != 'nt':
+        return
+    real_init = subprocess.Popen.__init__
+
+    def quiet_init(self, *args, **kwargs):  # noqa: ANN001
+        kwargs['creationflags'] = kwargs.get('creationflags', 0) | subprocess.CREATE_NO_WINDOW
+        startup = kwargs.get('startupinfo') or subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startup
+        real_init(self, *args, **kwargs)
+
+    subprocess.Popen.__init__ = quiet_init  # type: ignore[method-assign]
+
+
+_hide_child_windows()
+
 
 # yt-dlp messages that mean another attempt cannot succeed.
 FATAL_HINTS = (
