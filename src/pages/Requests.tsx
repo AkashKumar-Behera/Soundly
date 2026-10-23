@@ -28,7 +28,7 @@ export function Requests() {
   useEffect(() => {
     void loadRequests()
     if (mode !== 'api') return
-    const t = setInterval(() => void loadRequests(), busy ? 1500 : 6000)
+    const t = setInterval(() => !document.hidden && void loadRequests(), busy ? 4000 : 20000)
     return () => clearInterval(t)
   }, [loadRequests, mode, busy])
 

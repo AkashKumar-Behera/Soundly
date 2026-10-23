@@ -46,7 +46,7 @@ export function useAdminData<T>(path: string, pollMs = 0) {
         }
       })
       .catch((e) => live && setError((e as { code?: string }).code ?? 'error'))
-    const timer = pollMs ? setInterval(() => void reload(), pollMs) : undefined
+    const timer = pollMs ? setInterval(() => !document.hidden && void reload(), Math.max(pollMs * 2.5, 4000)) : undefined
     return () => {
       live = false
       if (timer) clearInterval(timer)
