@@ -1,12 +1,13 @@
-import { CirclePlay, Download } from 'lucide-react'
+import { CirclePlay } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Cover } from '../components/Cover'
+import { ImportPanel } from '../components/ImportPanel'
+import { YoutubeRow } from '../components/YoutubeRow'
 import { SongRow } from '../components/SongRow'
 import { categories } from '../data/mock'
 import type { Song } from '../data/mock'
-import { formatTime } from '../lib/format'
-import { hueFromId, useCanRequestDirect, useLibrary, useRole } from '../store/library'
+import { parseYoutubeLink } from '../lib/youtubeUrl'
+import { useCanRequestDirect, useLibrary, useRole } from '../store/library'
 import type { YoutubeResult } from '../store/library'
 import { usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
@@ -23,17 +24,8 @@ const messages: Record<string, string> = {
   search_quota: 'YouTube search is busy today, try again tomorrow',
   youtube_error: 'YouTube search failed, try again',
   query_too_short: 'Type a little more to search YouTube',
+  not_found: 'YouTube could not find that video',
 }
-
-const statusLabel: Record<string, string> = {
-  pending_approval: 'Pending approval',
-  queued: 'Queued',
-  downloading: 'Downloading',
-  uploading: 'Uploading',
-}
-
-// Matches the server default for max_duration_sec; longer videos always need an admin.
-const LONG_SECONDS = 1200
 
 type YtState = { q: string; phase: 'loading' | 'done' | 'error'; results: YoutubeResult[]; error?: string }
 
@@ -45,6 +37,7 @@ export function Search() {
   const direct = useCanRequestDirect()
   const searchSongs = useLibrary((s) => s.searchSongs)
   const searchYoutube = useLibrary((s) => s.searchYoutube)
+  const lookupVideo = useLibrary((s) => s.lookupVideo)
   const createRequest = useLibrary((s) => s.createRequest)
   const showToast = useUi((s) => s.showToast)
   const [results, setResults] = useState<Song[] | null>(null)
@@ -74,6 +67,20 @@ export function Search() {
     setYt(r.ok ? { q, phase: 'done', results: r.results } : { q, phase: 'error', results: [], error: r.error })
   }
 
+  const link = parseYoutubeLink(q)
+
+  // A pasted video link skips the search and shows that exact video.
+  useEffect(() => {
+    if (link?.kind !== 'video') return
+    let live = true
+    setYt({ q, phase: 'loading', results: [] })
+    void lookupVideo(link.id).then((r) => live && setYt(r.ok ? { q, phase: 'done', results: r.results } : { q, phase: 'error', results: [], error: r.error }))
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q])
+
   const request = async (v: YoutubeResult) => {
     const r = await createRequest({ youtubeId: v.youtubeId, title: v.title, channel: v.channel, durationSec: v.durationSec, category: v.category })
     if (r.ok) {
@@ -99,6 +106,8 @@ export function Search() {
     )
   }
 
+  if (link?.kind === 'playlist') return <ImportPanel listId={link.listId} />
+
   const list = results ?? []
 
   return (
@@ -118,7 +127,7 @@ export function Search() {
         <CirclePlay size={22} /> Not here? Search on YouTube
       </h2>
 
-      {!ytForQuery && (
+      {!ytForQuery && link?.kind !== 'video' && (
         <button className="btn-pill yt-go" disabled={role === 'listener'} onClick={() => void runYoutube()}>
           Search YouTube for “{q}”
         </button>
@@ -137,33 +146,7 @@ export function Search() {
 
       <div className="yt-list">
         {ytForQuery?.results.map((v) => (
-          <div key={v.youtubeId} className="yt-item">
-            {v.thumbnail ? (
-              <div className="yt-thumb">
-                <img src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
-              </div>
-            ) : (
-              <Cover hue={hueFromId(v.youtubeId)} size={56} className="r8" />
-            )}
-            <div className="min0">
-              <div className="truncate yt-t">{v.title}</div>
-              <div className="truncate muted">
-                {v.channel} · {formatTime(v.durationSec)}
-                {v.category !== 'Music' && <span className="flag">{v.category}</span>}
-                {v.durationSec > LONG_SECONDS && <span className="flag">Very long</span>}
-              </div>
-            </div>
-            {v.songId ? (
-              <span className="status done">In library</span>
-            ) : v.requestStatus ? (
-              <span className={`status ${v.requestStatus}`}>{statusLabel[v.requestStatus] ?? v.requestStatus}</span>
-            ) : (
-              <button className="btn-pill" onClick={() => void request(v)}>
-                <Download size={16} />
-                {direct && v.category === 'Music' && v.durationSec <= LONG_SECONDS ? 'Add to queue' : 'Request song'}
-              </button>
-            )}
-          </div>
+          <YoutubeRow key={v.youtubeId} video={v} direct={direct} onRequest={(x) => void request(x)} />
         ))}
       </div>
     </>

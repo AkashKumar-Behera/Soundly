@@ -25,6 +25,9 @@ export interface Playlist {
   description: string
   hue: number
   songCount: number
+  /** Songs of an imported playlist that are still waiting to be downloaded. */
+  pendingCount?: number
+  isOwner?: boolean
 }
 
 export interface SongRequest {
@@ -59,6 +62,26 @@ export interface YoutubeResult {
   songId: string | null
   /** Set while a request for this video is pending, queued or downloading. */
   requestStatus: string | null
+}
+
+export interface PlaylistPreview {
+  listId: string
+  title: string
+  channel: string
+  total: number
+  shown: number
+  max: number
+  items: YoutubeResult[]
+}
+
+export interface ImportResult {
+  playlistId: string
+  title: string
+  inLibrary: number
+  queued: number
+  pendingApproval: number
+  alreadyRequested: number
+  skipped: number
 }
 
 export type YoutubeSearch = { ok: true; results: YoutubeResult[] } | { ok: false; error: string }
@@ -137,6 +160,10 @@ interface LibraryState {
   getPlaylist: (id: string) => Promise<{ playlist: Playlist; songs: Song[] } | null>
   searchSongs: (q: string) => Promise<Song[]>
   searchYoutube: (q: string) => Promise<YoutubeSearch>
+  lookupVideo: (id: string) => Promise<YoutubeSearch>
+  previewPlaylist: (listId: string) => Promise<{ ok: true; preview: PlaylistPreview } | { ok: false; error: string }>
+  importPlaylist: (listId: string, ids: string[], title: string) => Promise<{ ok: true; result: ImportResult } | { ok: false; error: string }>
+  deletePlaylist: (id: string) => Promise<boolean>
   createRequest: (input: RequestInput) => Promise<RequestResult>
   loadRequests: () => Promise<void>
   decideRequest: (id: string, decision: 'approve' | 'reject') => Promise<void>
@@ -261,6 +288,45 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       return { ok: true, results: d.results }
     } catch (e) {
       return { ok: false, error: e instanceof ApiError ? e.code : 'network' }
+    }
+  },
+
+  lookupVideo: async (id) => {
+    if (get().mode === 'demo') return { ok: true, results: demoYoutube(`Video ${id.slice(0, 4)}`).slice(0, 1) }
+    try {
+      const d = await api<{ results: YoutubeResult[] }>(`/youtube/video?id=${encodeURIComponent(id)}`)
+      return { ok: true, results: d.results }
+    } catch (e) {
+      return { ok: false, error: e instanceof ApiError ? e.code : 'network' }
+    }
+  },
+
+  previewPlaylist: async (listId) => {
+    if (get().mode === 'demo') return { ok: false, error: 'demo_unavailable' }
+    try {
+      return { ok: true, preview: await api<PlaylistPreview>(`/youtube/playlist?list=${encodeURIComponent(listId)}`) }
+    } catch (e) {
+      return { ok: false, error: e instanceof ApiError ? e.code : 'network' }
+    }
+  },
+
+  importPlaylist: async (listId, ids, title) => {
+    try {
+      const result = await api<ImportResult>('/youtube/import', { method: 'POST', body: { listId, ids, title } })
+      void get().load()
+      return { ok: true, result }
+    } catch (e) {
+      return { ok: false, error: e instanceof ApiError ? e.code : 'network' }
+    }
+  },
+
+  deletePlaylist: async (id) => {
+    try {
+      await api(`/playlists/${id}`, { method: 'DELETE' })
+      void get().load()
+      return true
+    } catch {
+      return false
     }
   },
 

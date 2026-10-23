@@ -41,6 +41,7 @@ admin.post('/requests/:id/reject', async (c) => {
     .bind(reason, id)
     .run()
   if (!res.meta.changes) return c.json({ error: 'not_rejectable' }, 409)
+  await c.env.DB.prepare('DELETE FROM import_items WHERE youtube_id = (SELECT youtube_id FROM download_jobs WHERE id = ?)').bind(id).run()
   await audit(c.env.DB, c.get('user').id, 'request.reject', id, { reason })
   return c.json({ status: 'rejected' })
 })

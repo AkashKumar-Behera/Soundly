@@ -108,6 +108,8 @@ agent.post('/jobs/:id/complete', async (c) => {
         job.user_id,
       ),
     db.prepare("UPDATE download_jobs SET status = 'done', song_id = ?, error = NULL, updated_at = datetime('now') WHERE id = ?").bind(songId, id),
+    db.prepare('INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, position) SELECT playlist_id, ?1, position FROM import_items WHERE youtube_id = ?2').bind(songId, job.youtube_id),
+    db.prepare('DELETE FROM import_items WHERE youtube_id = ?').bind(job.youtube_id),
   ])
 
   return c.json({ songId })

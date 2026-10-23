@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
-import { canRequestDirect, requireUser } from '../auth'
+import { requireUser } from '../auth'
+import { createJob } from '../lib/jobs'
 import type { AppEnv } from '../types'
-import { getSetting } from '../util'
 
 export const requests = new Hono<AppEnv>()
 requests.use('*', requireUser)
@@ -14,8 +14,6 @@ interface RequestBody {
   category?: string
   url?: string
 }
-
-const YT_ID = /^[\w-]{11}$/
 
 export interface JobRow {
   id: string
@@ -51,68 +49,24 @@ export const shapeJob = (j: JobRow) => ({
   createdAt: j.created_at,
 })
 
-/**
- * Create a download request. Trusted users go straight to the queue, everyone else waits for admin
- * approval, and anything that looks like non-music (or is very long) always needs an admin to look at it.
- */
+/** Create a download request (rules live in lib/jobs.ts). */
 requests.post('/', async (c) => {
   const user = c.get('user')
   if (user.role === 'listener') return c.json({ error: 'forbidden', message: 'Listeners cannot request songs.' }, 403)
 
   const body = await c.req.json<RequestBody>().catch(() => ({}) as RequestBody)
-  const youtubeId = (body.youtubeId ?? '').trim()
-  const title = (body.title ?? '').trim().slice(0, 200)
-  if (!YT_ID.test(youtubeId) || !title) return c.json({ error: 'invalid_request' }, 400)
+  const r = await createJob(c.env.DB, user, {
+    youtubeId: body.youtubeId ?? '',
+    title: body.title ?? '',
+    channel: body.channel,
+    durationSec: body.durationSec,
+    category: body.category,
+    url: body.url,
+  })
+  if (r.ok) return c.json({ id: r.id, status: r.status, flags: r.flags }, 201)
 
-  const db = c.env.DB
-
-  const have = await db.prepare('SELECT id FROM songs WHERE youtube_id = ?').bind(youtubeId).first<{ id: string }>()
-  if (have) return c.json({ error: 'already_available', songId: have.id }, 409)
-
-  const used = await db
-    .prepare("SELECT COUNT(*) AS n FROM download_jobs WHERE user_id = ? AND created_at >= date('now')")
-    .bind(user.id)
-    .first<{ n: number }>()
-  if ((used?.n ?? 0) >= user.daily_request_limit) {
-    return c.json({ error: 'daily_limit_reached', limit: user.daily_request_limit }, 429)
-  }
-
-  const maxDuration = await getSetting(db, 'max_duration_sec', 1200)
-  const durationSec = Number.isFinite(body.durationSec) ? Math.max(0, Math.floor(body.durationSec as number)) : null
-  const category = (body.category ?? '').trim().slice(0, 40) || null
-
-  const flags: string[] = []
-  if (category && category.toLowerCase() !== 'music') flags.push('not_music')
-  if (durationSec !== null && durationSec > maxDuration) flags.push('too_long')
-
-  const status = canRequestDirect(user) && flags.length === 0 ? 'queued' : 'pending_approval'
-  const id = crypto.randomUUID()
-
-  try {
-    await db
-      .prepare(
-        `INSERT INTO download_jobs (id, user_id, youtube_id, youtube_url, title, channel, duration_sec, category, flags, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        user.id,
-        youtubeId,
-        (body.url ?? `https://www.youtube.com/watch?v=${youtubeId}`).slice(0, 300),
-        title,
-        (body.channel ?? '').slice(0, 120) || null,
-        durationSec,
-        category,
-        JSON.stringify(flags),
-        status,
-      )
-      .run()
-  } catch (e) {
-    if (String(e).includes('UNIQUE')) return c.json({ error: 'already_requested' }, 409)
-    throw e
-  }
-
-  return c.json({ id, status, flags }, 201)
+  const status = r.error === 'invalid_request' ? 400 : r.error === 'daily_limit_reached' ? 429 : 409
+  return c.json({ error: r.error, songId: r.songId, limit: r.limit }, status)
 })
 
 requests.get('/', async (c) => {

@@ -1,6 +1,7 @@
 import { ArrowDownToLine, Check, Heart, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Cover } from '../components/Cover'
 import { SongRow } from '../components/SongRow'
 import type { Song } from '../data/mock'
@@ -10,9 +11,13 @@ import { useCanSaveOffline } from '../lib/useOfflineSave'
 import { useOffline } from '../store/offline'
 import { usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
+import { ConfirmDialog } from './admin/ui'
 
 export function Playlist() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
+  const deletePlaylist = useLibrary((s) => s.deletePlaylist)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const getPlaylist = useLibrary((s) => s.getPlaylist)
   const likedIds = useLibrary((s) => s.liked)
   const playing = usePlayer((s) => s.playing)
@@ -74,6 +79,11 @@ export function Playlist() {
           <span className="eyebrow">Playlist</span>
           <h1>{pl.title}</h1>
           <p className="muted">{pl.description}</p>
+          {!!pl.pendingCount && (
+            <p className="muted">
+              {pl.pendingCount} song{pl.pendingCount === 1 ? ' is' : 's are'} still being added (downloading or waiting for approval).
+            </p>
+          )}
           <p className="pl-stats">
             <b>Soundly</b> · {list.length} songs{total ? `, ${Math.round(total / 60)} min` : ''}
           </p>
@@ -99,7 +109,26 @@ export function Playlist() {
           {allSaved ? <Check size={16} /> : <ArrowDownToLine size={16} />}
           {progress ? `Saving ${progress}` : allSaved ? 'Saved on this device' : 'Save for offline'}
         </button>
+        {pl.isOwner && !isLiked && (
+          <button className="icon-btn bad" aria-label="Delete playlist" onClick={() => setConfirmDelete(true)}>
+            <Trash2 size={20} />
+          </button>
+        )}
       </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete this playlist?"
+          danger
+          confirmLabel="Delete"
+          body={<><b>{pl.title}</b> will be removed. The songs stay in the library.</>}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={async () => {
+            if (await deletePlaylist(id)) navigate('/library')
+            else setConfirmDelete(false)
+          }}
+        />
+      )}
 
       <div className="song-table">
         <div className="song-head">

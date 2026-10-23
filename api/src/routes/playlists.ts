@@ -14,6 +14,7 @@ interface PlaylistRow {
   hue: number
   is_public: number
   songCount: number
+  pendingCount: number
 }
 
 const shape = (p: PlaylistRow, userId: string) => ({
@@ -24,12 +25,14 @@ const shape = (p: PlaylistRow, userId: string) => ({
   isPublic: !!p.is_public,
   isOwner: p.owner_id === userId,
   songCount: p.songCount,
+  pendingCount: p.pendingCount,
 })
 
 playlists.get('/', async (c) => {
   const userId = c.get('user').id
   const { results } = await c.env.DB.prepare(
-    `SELECT p.*, (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) AS songCount
+    `SELECT p.*, (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) AS songCount,
+            (SELECT COUNT(*) FROM import_items ii WHERE ii.playlist_id = p.id) AS pendingCount
      FROM playlists p WHERE p.is_public = 1 OR p.owner_id = ? ORDER BY p.created_at, p.title`,
   )
     .bind(userId)
@@ -40,7 +43,8 @@ playlists.get('/', async (c) => {
 async function loadPlayable(c: { env: AppEnv['Bindings']; get: (k: 'user') => AppEnv['Variables']['user'] }, id: string) {
   const userId = c.get('user').id
   return c.env.DB.prepare(
-    `SELECT p.*, (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) AS songCount
+    `SELECT p.*, (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) AS songCount,
+            (SELECT COUNT(*) FROM import_items ii WHERE ii.playlist_id = p.id) AS pendingCount
      FROM playlists p WHERE p.id = ? AND (p.is_public = 1 OR p.owner_id = ?)`,
   )
     .bind(id, userId)
@@ -106,5 +110,11 @@ playlists.delete('/:id/songs/:songId', async (c) => {
     .first()
   if (!owned) return c.json({ error: 'forbidden' }, 403)
   await c.env.DB.prepare('DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?').bind(c.req.param('id'), c.req.param('songId')).run()
+  return c.json({ ok: true })
+})
+
+playlists.delete('/:id', async (c) => {
+  const res = await c.env.DB.prepare('DELETE FROM playlists WHERE id = ? AND owner_id = ?').bind(c.req.param('id'), c.get('user').id).run()
+  if (!res.meta.changes) return c.json({ error: 'forbidden' }, 403)
   return c.json({ ok: true })
 })
