@@ -79,20 +79,3 @@ export const categories: Category[] = [
   { id: 'sleep', title: 'Sleep', hue: 240 },
   { id: 'romance', title: 'Romance', hue: 345 },
 ]
-
-export const lyrics: string[] = [
-  'Lights go down on the empty street',
-  'Heartbeat keeping time with my feet',
-  'Every road leads back to you',
-  'And I let the night come through',
-  'Hold on, hold on, let the music play',
-  'Carry all the noise away',
-  'We are only here for a while',
-  'So turn it up and stay a while',
-  'Colors fade but the sound remains',
-  'Echo through the window panes',
-  'Take my hand, we will go',
-  'Wherever the wild winds blow',
-  'One more song before it ends',
-  'Close your eyes, begin again',
-]

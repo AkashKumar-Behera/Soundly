@@ -6,6 +6,7 @@ import { agent } from './routes/agent'
 import { auth } from './routes/auth'
 import { rooms } from './routes/rooms'
 import { likes, me, plays } from './routes/library'
+import { lyrics } from './routes/lyrics'
 import { playlists } from './routes/playlists'
 import { requests } from './routes/requests'
 import { songs, stream, thumbs } from './routes/songs'
@@ -42,6 +43,7 @@ app.route('/api/requests', requests)
 app.route('/api/youtube', youtube)
 app.route('/api/wrapped', wrapped)
 app.route('/api/rooms', rooms)
+app.route('/api/lyrics', lyrics)
 app.route('/api/admin', admin)
 app.route('/api/admin', adminManage)
 app.route('/api/agent', agent)

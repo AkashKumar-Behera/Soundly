@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ChevronDown, Heart, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { lyrics } from '../data/mock'
+import { api, isDemo } from '../api/client'
 import { useApp } from '../store/app'
 import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
@@ -14,29 +14,131 @@ import { Visualizer } from './Visualizer'
 
 type Tab = 'lyrics' | 'queue'
 
+interface LyricsData {
+  found: boolean
+  instrumental: boolean
+  approx: boolean
+  synced: { t: number; text: string }[] | null
+  plain: string | null
+}
+
+const lyricsCache = new Map<string, LyricsData>()
+const offsetKey = (id: string) => `soundly.lyrics-offset.${id}`
+const loadOffset = (id: string) => {
+  try {
+    return Number(localStorage.getItem(offsetKey(id))) || 0
+  } catch {
+    return 0
+  }
+}
+
 function Lyrics() {
-  const progress = usePlayer((s) => (s.duration > 0 ? s.time / s.duration : 0))
-  const active = Math.min(lyrics.length - 1, Math.floor(progress * lyrics.length))
+  const song = useCurrent()
+  const id = song?.id
+  const [data, setData] = useState<LyricsData | null>(null)
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [offset, setOffset] = useState(0)
   const refs = useRef<(HTMLParagraphElement | null)[]>([])
 
   useEffect(() => {
-    refs.current[active]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (!id) return
+    setOffset(loadOffset(id))
+    const hit = lyricsCache.get(id)
+    if (hit) {
+      setData(hit)
+      setState('ready')
+      return
+    }
+    setData(null)
+    setState('loading')
+    let live = true
+    api<LyricsData>(`/lyrics/${id}`)
+      .then((d) => {
+        lyricsCache.set(id, d)
+        if (live) {
+          setData(d)
+          setState('ready')
+        }
+      })
+      .catch(() => live && setState('error'))
+    return () => {
+      live = false
+    }
+  }, [id])
+
+  const lines = data?.synced
+  // Subscribe to the line index only, so the panel re-renders on a line change and not on every time tick.
+  const active = usePlayer((s) => {
+    if (!lines?.length) return -1
+    const t = s.time + 0.25 + offset
+    let lo = 0
+    let hi = lines.length - 1
+    let at = -1
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (lines[mid].t <= t) {
+        at = mid
+        lo = mid + 1
+      } else hi = mid - 1
+    }
+    return at
+  })
+
+  useEffect(() => {
+    if (active >= 0) refs.current[active]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [active])
 
+  const nudge = (d: number) => {
+    if (!id) return
+    const next = Math.round((offset + d) * 10) / 10
+    setOffset(next)
+    try {
+      localStorage.setItem(offsetKey(id), String(next))
+    } catch {
+      /* private mode: the nudge just lasts for this session */
+    }
+  }
+
+  if (isDemo()) return <div className="lyrics"><small>Lyrics need the live server.</small></div>
+  if (state === 'loading') return <div className="lyrics"><small>Finding lyrics…</small></div>
+  if (state === 'error' || !data) return <div className="lyrics"><small>Could not load lyrics. Try again in a bit.</small></div>
+  if (data.instrumental) return <div className="lyrics"><small>Instrumental. No lyrics here.</small></div>
+  if (!data.found) return <div className="lyrics"><small>No lyrics found for this song.</small></div>
+
+  if (lines?.length) {
+    return (
+      <div className="lyrics">
+        {lines.map((line, i) => (
+          <p
+            key={i}
+            ref={(el) => {
+              refs.current[i] = el
+            }}
+            className={i === active ? 'on' : i < active ? 'past' : ''}
+            onClick={() => usePlayer.getState().seek(Math.max(0, line.t - offset))}
+          >
+            {line.text || '♪'}
+          </p>
+        ))}
+        <div className="lyrics-sync">
+          <button onClick={() => nudge(-0.5)} aria-label="Lyrics earlier">
+            Earlier
+          </button>
+          <span>{offset === 0 ? 'In sync' : `${offset > 0 ? '+' : ''}${offset}s`}</span>
+          <button onClick={() => nudge(0.5)} aria-label="Lyrics later">
+            Later
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="lyrics">
-      {lyrics.map((line, i) => (
-        <p
-          key={i}
-          ref={(el) => {
-            refs.current[i] = el
-          }}
-          className={i === active ? 'on' : i < active ? 'past' : ''}
-        >
-          {line}
-        </p>
+    <div className="lyrics plain">
+      {data.plain?.split(String.fromCharCode(10)).map((l, i) => (
+        <p key={i}>{l || ' '}</p>
       ))}
-      <small>Sample lyrics. Synced lyrics arrive with the backend.</small>
+      <small>{data.approx ? 'Lyrics from another version of this song, so they may differ. Not synced.' : 'Not synced for this song.'}</small>
     </div>
   )
 }

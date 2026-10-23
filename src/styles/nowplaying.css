@@ -260,6 +260,31 @@
   color: #fff;
   transform: scale(1.03);
 }
+.lyrics p {
+  cursor: pointer;
+}
+.lyrics.plain p {
+  cursor: default;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.8);
+  margin-bottom: 6px;
+}
+.lyrics-sync {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  font-size: 13px;
+  color: rgb(255 255 255 / 0.6);
+}
+.lyrics-sync button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+  font-size: 13px;
+}
 .lyrics small {
   display: block;
   margin-top: 28px;
