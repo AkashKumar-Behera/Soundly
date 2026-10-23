@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { requireUser } from '../auth'
 import { createJob } from '../lib/jobs'
+import { queueInfo } from '../lib/queue'
+import type { QueueInfo } from '../lib/queue'
 import { wakeAgent } from '../lib/wake'
 import type { AppEnv } from '../types'
 
@@ -31,9 +33,13 @@ export interface JobRow {
   reject_reason: string | null
   song_id: string | null
   created_at: string
+  stage?: string | null
+  progress?: number | null
+  eta_sec?: number | null
+  speed_bps?: number | null
 }
 
-export const shapeJob = (j: JobRow) => ({
+export const shapeJob = (j: JobRow, q?: QueueInfo) => ({
   id: j.id,
   userId: j.user_id,
   userName: j.userName,
@@ -48,6 +54,13 @@ export const shapeJob = (j: JobRow) => ({
   rejectReason: j.reject_reason,
   songId: j.song_id,
   createdAt: j.created_at,
+  // Live progress while the agent works on it, and where a waiting job stands in the queue.
+  stage: j.stage ?? null,
+  progress: j.progress ?? null,
+  etaSec: j.eta_sec ?? null,
+  speedBps: j.speed_bps ?? null,
+  ahead: q && j.status === 'queued' ? (q.ahead.get(j.id) ?? 0) : null,
+  waitSec: q && j.status === 'queued' ? ((q.ahead.get(j.id) ?? 0) + 1) * q.avgSec : null,
 })
 
 /** Create a download request (rules live in lib/jobs.ts). */
@@ -79,5 +92,6 @@ requests.get('/', async (c) => {
   )
     .bind(c.get('user').id)
     .all<JobRow>()
-  return c.json({ requests: results.map(shapeJob) })
+  const q = await queueInfo(c.env.DB)
+  return c.json({ requests: results.map((j) => shapeJob(j, q)) })
 })

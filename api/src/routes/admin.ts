@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
 import type { AppEnv } from '../types'
+import { queueInfo } from '../lib/queue'
 import { agentStatus, wakeAgent } from '../lib/wake'
 import { audit, getSetting } from '../util'
 import { shapeJob } from './requests'
@@ -17,7 +18,8 @@ admin.get('/requests', async (c) => {
     ? c.env.DB.prepare(`${base} WHERE j.status = ? ORDER BY j.created_at DESC LIMIT 200`).bind(status)
     : c.env.DB.prepare(`${base} ORDER BY j.created_at DESC LIMIT 200`)
   const { results } = await stmt.all<JobRow>()
-  return c.json({ requests: results.map(shapeJob) })
+  const q = await queueInfo(c.env.DB)
+  return c.json({ requests: results.map((j) => shapeJob(j, q)) })
 })
 
 admin.post('/requests/:id/approve', async (c) => {

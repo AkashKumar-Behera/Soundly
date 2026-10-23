@@ -41,7 +41,8 @@ agent.post('/claim', async (c) => {
 
   const job = await c.env.DB.prepare(
     `UPDATE download_jobs
-     SET status = 'downloading', attempts = attempts + 1, claimed_at = datetime('now'), updated_at = datetime('now')
+     SET status = 'downloading', attempts = attempts + 1, claimed_at = datetime('now'), updated_at = datetime('now'),
+         stage = 'starting', progress = 0, eta_sec = NULL, speed_bps = NULL, progress_at = datetime('now')
      WHERE id = (SELECT id FROM download_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1) AND status = 'queued'
      RETURNING id, youtube_id AS youtubeId, youtube_url AS url, title, channel, duration_sec AS durationSec`,
   ).first()
@@ -55,6 +56,22 @@ agent.put('/upload', async (c) => {
   const type = c.req.header('Content-Type') ?? 'application/octet-stream'
   const obj = await c.env.SONGS.put(key, c.req.raw.body, { httpMetadata: { contentType: type } })
   return c.json({ key, size: obj.size })
+})
+
+/** Live progress from the agent (throttled on its side). Ignored once the job is no longer active. */
+agent.post('/jobs/:id/progress', async (c) => {
+  const b = await c.req.json<{ stage?: string; progress?: number; etaSec?: number | null; speedBps?: number | null }>().catch(() => ({}) as { stage?: string; progress?: number; etaSec?: number | null; speedBps?: number | null })
+  const stage = ['starting', 'downloading', 'converting', 'uploading', 'saving'].includes(b.stage ?? '') ? b.stage : null
+  if (!stage) return c.json({ error: 'invalid_stage' }, 400)
+  const progress = Math.max(0, Math.min(1, Number(b.progress) || 0))
+  const eta = Number.isFinite(b.etaSec) ? Math.max(0, Math.round(b.etaSec as number)) : null
+  const speed = Number.isFinite(b.speedBps) ? Math.max(0, Math.round(b.speedBps as number)) : null
+  await c.env.DB.prepare(
+    "UPDATE download_jobs SET stage = ?, progress = ?, eta_sec = ?, speed_bps = ?, progress_at = datetime('now') WHERE id = ? AND status IN ('downloading', 'uploading')",
+  )
+    .bind(stage, progress, eta, speed, c.req.param('id'))
+    .run()
+  return c.json({ ok: true })
 })
 
 agent.post('/jobs/:id/uploading', async (c) => {
@@ -114,7 +131,7 @@ agent.post('/jobs/:id/complete', async (c) => {
         Number.isFinite(body.bitrateKbps) ? Math.floor(body.bitrateKbps as number) : null,
         job.user_id,
       ),
-    db.prepare("UPDATE download_jobs SET status = 'done', song_id = ?, error = NULL, updated_at = datetime('now') WHERE id = ?").bind(songId, id),
+    db.prepare("UPDATE download_jobs SET status = 'done', song_id = ?, error = NULL, stage = NULL, progress = 1, eta_sec = NULL, speed_bps = NULL, updated_at = datetime('now') WHERE id = ?").bind(songId, id),
     db.prepare('INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, position) SELECT playlist_id, ?1, position FROM import_items WHERE youtube_id = ?2').bind(songId, job.youtube_id),
     db.prepare('DELETE FROM import_items WHERE youtube_id = ?').bind(job.youtube_id),
   ])

@@ -1,8 +1,7 @@
 import { Check, RotateCcw, X } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/client'
-import { Cover } from '../../components/Cover'
-import { hueFromId } from '../../store/library'
+import { RequestProgress, YtThumb } from '../../components/RequestProgress'
 import { useUi } from '../../store/ui'
 import { timeAgo, useAdminData } from './ui'
 
@@ -18,6 +17,12 @@ interface Job {
   error: string | null
   rejectReason: string | null
   createdAt: string
+  stage: string | null
+  progress: number | null
+  etaSec: number | null
+  speedBps: number | null
+  ahead: number | null
+  waitSec: number | null
 }
 
 const FILTERS = [
@@ -45,8 +50,12 @@ export function QueueTab() {
   const showToast = useUi((s) => s.showToast)
   const [filter, setFilter] = useState('pending_approval')
   // "Working" covers both downloading and uploading, so fetch everything and filter here.
-  const { data, reload } = useAdminData<{ requests: Job[] }>('/admin/requests', 5000)
+  // Poll faster while a download is running so its bar moves.
+  const [fast, setFast] = useState(false)
+  const { data, reload } = useAdminData<{ requests: Job[] }>('/admin/requests', fast ? 1500 : 5000)
   const all = data?.requests ?? []
+  const running = all.some((j) => j.status === 'downloading' || j.status === 'uploading')
+  if (running !== fast) setFast(running)
   const rows = all.filter((j) => (filter === '' ? true : filter === 'downloading' ? ['downloading', 'uploading'].includes(j.status) : j.status === filter))
   const count = (id: string) => all.filter((j) => (id === '' ? true : id === 'downloading' ? ['downloading', 'uploading'].includes(j.status) : j.status === id)).length
   const cleanPending = all.filter((j) => j.status === 'pending_approval' && !j.flags.length)
@@ -86,7 +95,7 @@ export function QueueTab() {
       <div className="rows">
         {rows.map((j) => (
           <div key={j.id} className="row">
-            <Cover hue={hueFromId(j.youtubeId)} size={48} className="r8" />
+            <YtThumb youtubeId={j.youtubeId} size={48} />
             <div className="min0 grow">
               <div className="truncate strong">{j.title}</div>
               <div className="truncate muted">
@@ -97,6 +106,7 @@ export function QueueTab() {
                   </span>
                 ))}
               </div>
+              <RequestProgress job={j} />
               {j.status === 'failed' && j.error && <div className="row-error truncate">{j.error}</div>}
               {j.status === 'rejected' && j.rejectReason && <div className="muted truncate">{j.rejectReason}</div>}
             </div>

@@ -1,7 +1,7 @@
 import { Check, X } from 'lucide-react'
 import { useEffect } from 'react'
-import { Cover } from '../components/Cover'
-import { hueFromId, useLibrary, useRole } from '../store/library'
+import { RequestProgress, YtThumb } from '../components/RequestProgress'
+import { useLibrary, useRole } from '../store/library'
 import type { RequestStatus } from '../store/library'
 
 const label: Record<RequestStatus, string> = {
@@ -23,13 +23,14 @@ export function Requests() {
   const decide = useLibrary((s) => s.decideRequest)
   const role = useRole()
 
-  // Keep statuses fresh while the page is open (downloads progress on the laptop).
+  // Refresh quickly while something is downloading (live progress), slowly otherwise.
+  const busy = requests.some((r) => r.status === 'downloading' || r.status === 'uploading')
   useEffect(() => {
     void loadRequests()
     if (mode !== 'api') return
-    const t = setInterval(() => void loadRequests(), 5000)
+    const t = setInterval(() => void loadRequests(), busy ? 1500 : 6000)
     return () => clearInterval(t)
-  }, [loadRequests, mode])
+  }, [loadRequests, mode, busy])
 
   return (
     <>
@@ -45,7 +46,7 @@ export function Requests() {
       <div className="yt-list">
         {requests.map((r) => (
           <div key={r.id} className="yt-item">
-            <Cover hue={hueFromId(r.youtubeId)} size={56} className="r8" />
+            <YtThumb youtubeId={r.youtubeId} />
             <div className="min0">
               <div className="truncate yt-t">{r.title}</div>
               <div className="truncate muted">
@@ -56,6 +57,7 @@ export function Requests() {
                   </span>
                 ))}
               </div>
+              <RequestProgress job={r} />
             </div>
             <span className={`status ${r.status}`}>{label[r.status]}</span>
             {role === 'admin' && r.status === 'pending_approval' && (

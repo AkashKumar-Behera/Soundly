@@ -34,7 +34,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -103,6 +103,58 @@ def on_home_network(cfg: dict) -> bool:
     return not cfg['home_ssids'] or ssid in cfg['home_ssids']
 
 
+# ---------------------------------------------------------------- progress reporting
+
+
+class ProgressFile:
+    """File-like request body that reports how many bytes have been sent (requests streams it with a known length)."""
+
+    def __init__(self, path: Path, on_progress=None):
+        self._fh = path.open('rb')
+        self._size = path.stat().st_size
+        self._sent = 0
+        self._cb = on_progress
+        self._start = time.time()
+
+    def __len__(self) -> int:
+        return self._size
+
+    def read(self, n: int = -1) -> bytes:
+        chunk = self._fh.read(n)
+        if chunk:
+            self._sent += len(chunk)
+            if self._cb:
+                self._cb(self._sent, self._size, time.time() - self._start)
+        return chunk
+
+    def __iter__(self):
+        return iter(lambda: self.read(65536), b'')
+
+    def close(self) -> None:
+        self._fh.close()
+
+
+class Reporter:
+    """Sends live progress of one job to the server, at most every 1.5 s (always on a stage change)."""
+
+    MIN_GAP = 1.5
+
+    def __init__(self, api: 'Api', job_id: str):
+        self.api, self.job_id = api, job_id
+        self.last = 0.0
+        self.stage = ''
+
+    def send(self, stage: str, overall: float, eta: float | None = None, speed: float | None = None, force: bool = False) -> None:
+        now = time.time()
+        if not force and stage == self.stage and now - self.last < self.MIN_GAP:
+            return
+        self.stage, self.last = stage, now
+        try:
+            self.api.progress(self.job_id, stage, max(0.0, min(1.0, overall)), eta, speed)
+        except requests.RequestException:
+            pass  # progress is cosmetic; never let it fail a download
+
+
 # ---------------------------------------------------------------- API client
 
 
@@ -126,10 +178,16 @@ class Api:
     def uploading(self, job_id: str) -> None:
         self._post(f'/agent/jobs/{job_id}/uploading')
 
-    def upload(self, key: str, path: Path, content_type: str) -> None:
-        with path.open('rb') as fh:
-            r = self.http.put(f'{self.base}/agent/upload', params={'key': key}, data=fh, headers={'Content-Type': content_type}, timeout=600)
+    def upload(self, key: str, path: Path, content_type: str, on_progress=None) -> None:
+        body = ProgressFile(path, on_progress)
+        try:
+            r = self.http.put(f'{self.base}/agent/upload', params={'key': key}, data=body, headers={'Content-Type': content_type}, timeout=600)
+        finally:
+            body.close()
         r.raise_for_status()
+
+    def progress(self, job_id: str, stage: str, progress: float, eta: float | None, speed: float | None) -> None:
+        self._post(f'/agent/jobs/{job_id}/progress', {'stage': stage, 'progress': progress, 'etaSec': eta, 'speedBps': speed}, timeout=8)
 
     def complete(self, job_id: str, payload: dict) -> dict:
         return self._post(f'/agent/jobs/{job_id}/complete', payload, timeout=30)
@@ -160,8 +218,25 @@ def make_cover(ffmpeg: str, source: Path, dest: Path) -> bool:
         return False
 
 
-def download(cfg: dict, job: dict, workdir: Path) -> tuple[dict, Path, Path | None]:
+def download(cfg: dict, job: dict, workdir: Path, rep: Reporter | None = None) -> tuple[dict, Path, Path | None]:
+    # Overall bar: download 0-65%, MP3 conversion 65-75%, upload 75-97%, saving to 100%.
+    def on_download(d: dict) -> None:
+        if rep is None:
+            return
+        if d.get('status') == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+            frac = (d.get('downloaded_bytes') or 0) / total if total else 0.0
+            rep.send('downloading', 0.02 + 0.63 * frac, d.get('eta'), d.get('speed'))
+        elif d.get('status') == 'finished':
+            rep.send('downloading', 0.65, 0, None, force=True)
+
+    def on_convert(d: dict) -> None:
+        if rep is not None and d.get('status') == 'started':
+            rep.send('converting', 0.70, None, None, force=True)
+
     opts = {
+        'progress_hooks': [on_download],
+        'postprocessor_hooks': [on_convert],
         'quiet': True,
         'no_warnings': True,
         'noprogress': True,
@@ -198,12 +273,20 @@ def process_job(api: Api, cfg: dict, job: dict) -> None:
     vid = job['youtubeId']
     log.info('job %s: %s (%s)', job['id'][:8], job['title'], vid)
     workdir = Path(tempfile.mkdtemp(prefix='soundly_'))
+    rep = Reporter(api, job['id'])
+    rep.send('starting', 0.01, force=True)
     try:
-        info, mp3, thumb = download(cfg, job, workdir)
+        info, mp3, thumb = download(cfg, job, workdir, rep)
         api.uploading(job['id'])
+        rep.send('uploading', 0.75, None, None, force=True)
+
+        def on_upload(sent: int, size: int, elapsed: float) -> None:
+            speed = sent / elapsed if elapsed > 0 else None
+            eta = (size - sent) / speed if speed else None
+            rep.send('uploading', 0.75 + 0.22 * (sent / size if size else 1), eta, speed)
 
         song_key = f'songs/{vid}.mp3'
-        api.upload(song_key, mp3, 'audio/mpeg')
+        api.upload(song_key, mp3, 'audio/mpeg', on_upload)
 
         thumb_key = None
         if thumb is not None:
@@ -211,6 +294,7 @@ def process_job(api: Api, cfg: dict, job: dict) -> None:
             if make_cover(cfg['ffmpeg'], thumb, cover):
                 thumb_key = f'thumbs/{vid}.webp'
                 api.upload(thumb_key, cover, 'image/webp')
+        rep.send('saving', 0.98, None, None, force=True)
 
         result = api.complete(
             job['id'],

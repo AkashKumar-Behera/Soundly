@@ -430,3 +430,48 @@
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
 }
+
+/* ---------- Request progress ---------- */
+.rq-note {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rq-progress {
+  margin-top: 6px;
+  max-width: 460px;
+}
+.rq-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 6px;
+  background: var(--hover);
+  overflow: hidden;
+}
+.rq-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  transition: width 0.9s linear;
+}
+.rq-bar.busy i {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 35%, transparent), var(--accent));
+  background-size: 200% 100%;
+  animation: rqshine 1.2s linear infinite;
+}
+@keyframes rqshine {
+  to {
+    background-position: -200% 0;
+  }
+}
+.rq-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

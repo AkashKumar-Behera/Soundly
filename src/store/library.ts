@@ -39,6 +39,12 @@ export interface SongRequest {
   flags: string[]
   status: RequestStatus
   rejectReason: string | null
+  stage: string | null
+  progress: number | null
+  etaSec: number | null
+  speedBps: number | null
+  ahead: number | null
+  waitSec: number | null
 }
 
 export interface RequestInput {
@@ -335,7 +341,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       const role = get().demoRole
       const status: RequestStatus = role === 'trusted' || role === 'admin' ? 'queued' : 'pending_approval'
       if (role === 'listener') return { ok: false, error: 'forbidden' }
-      const item: SongRequest = { id: crypto.randomUUID(), youtubeId: input.youtubeId, title: input.title, channel: input.channel, flags: [], status, rejectReason: null }
+      const item: SongRequest = { id: crypto.randomUUID(), youtubeId: input.youtubeId, title: input.title, channel: input.channel, flags: [], status, rejectReason: null, stage: null, progress: null, etaSec: null, speedBps: null, ahead: null, waitSec: null }
       set((s) => ({ requests: [item, ...s.requests] }))
       return { ok: true, status }
     }
