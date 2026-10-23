@@ -826,3 +826,34 @@ img {
   color: var(--accent);
   font-weight: 700;
 }
+
+.update-back {
+  z-index: 120;
+  background: rgb(0 0 0 / 0.7);
+}
+.update-modal {
+  align-items: center;
+  width: min(360px, 100%);
+  padding: 28px 24px 20px;
+  text-align: center;
+}
+.update-modal .modal-actions {
+  justify-content: center;
+  width: 100%;
+}
+.update-modal .btn-pill {
+  min-width: 120px;
+  justify-content: center;
+}
+.update-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+.update-icon .spin {
+  animation: spin 1s linear infinite;
+}
