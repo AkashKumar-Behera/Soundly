@@ -1,4 +1,4 @@
-import { Heart, Plus } from 'lucide-react'
+import { Heart, Mic2, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '../components/Card'
@@ -39,9 +39,14 @@ export function Library() {
       <div className="page-title-row">
         <h1 className="page-title">Your Library</h1>
         {mode === 'api' && (
-          <button className="btn-pill" onClick={() => setCreatePlaylist(true)}>
-            <Plus size={16} /> New playlist
-          </button>
+          <div className="title-actions">
+            <button className="btn-pill" onClick={() => navigate('/artists')}>
+              <Mic2 size={16} /> Artists
+            </button>
+            <button className="btn-pill" onClick={() => setCreatePlaylist(true)}>
+              <Plus size={16} /> New playlist
+            </button>
+          </div>
         )}
       </div>
       <div className="chips">

@@ -571,3 +571,46 @@ img {
 .yt-item.playable:hover {
   background: var(--panel-2);
 }
+
+.title-actions {
+  display: flex;
+  gap: 8px;
+}
+.artist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+}
+.artist-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border-radius: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.artist-card:hover {
+  background: var(--panel-2);
+}
+.artist-card .strong,
+.artist-card .muted {
+  max-width: 100%;
+}
+.artist-pic {
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+.artist-pic.fallback {
+  display: grid;
+  place-items: center;
+  font-size: 48px;
+  font-weight: 800;
+  color: #fff;
+}
+.artist-found {
+  margin-bottom: 8px;
+}

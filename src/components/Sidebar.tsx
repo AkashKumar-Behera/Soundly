@@ -1,4 +1,4 @@
-import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings, ShieldCheck, Sparkles } from 'lucide-react'
+import { Mic2, Crown, Heart, House, Inbox, Library, Plus, Search, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useLibrary, useRole } from '../store/library'
 import { useUi } from '../store/ui'
@@ -8,6 +8,7 @@ import { Logo } from './Logo'
 const nav = [
   { to: '/', label: 'Home', icon: House, end: true },
   { to: '/search', label: 'Search', icon: Search },
+  { to: '/artists', label: 'Artists', icon: Mic2 },
   { to: '/requests', label: 'Requests', icon: Inbox },
   { to: '/wrapped', label: 'Wrapped', icon: Sparkles },
   { to: '/settings', label: 'Settings', icon: Settings },

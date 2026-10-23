@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { Splash } from './components/Splash'
 import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
+import { Artists } from './pages/Artists'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
 import { Playlist } from './pages/Playlist'
@@ -66,6 +67,7 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="search" element={<Search />} />
           <Route path="library" element={<Library />} />
+          <Route path="artists" element={<Artists />} />
           <Route path="playlist/:id" element={<Playlist />} />
           <Route path="requests" element={<Requests />} />
           <Route path="settings" element={<Settings />} />

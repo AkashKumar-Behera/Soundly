@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { formatTime } from '../../lib/format'
 import { useUi } from '../../store/ui'
+import { timeAgo, useAdminData } from './ui'
 
 interface Artist {
   browseId: string
@@ -18,6 +19,57 @@ interface Track {
   thumbnail: string
   songId: string | null
   requestStatus: string | null
+}
+
+interface ArtistRequest {
+  id: string
+  name: string
+  imageUrl: string | null
+  userName: string
+  createdAt: string
+}
+
+/** Artists that members asked for; approving queues the whole catalogue. */
+function ArtistRequests() {
+  const showToast = useUi((s) => s.showToast)
+  const { data, reload } = useAdminData<{ requests: ArtistRequest[] }>('/admin/artists/requests', 8000)
+  const rows = data?.requests ?? []
+  if (!rows.length) return null
+
+  const decide = async (id: string, decision: 'approve' | 'reject') => {
+    try {
+      const r = await api<{ queued: number }>(`/admin/artists/requests/${id}/${decision}`, { method: 'POST', body: {} })
+      showToast(decision === 'approve' ? `${r.queued} songs queued` : 'Rejected')
+    } catch {
+      showToast('Could not do that, refreshing')
+    }
+    void reload()
+  }
+
+  return (
+    <>
+      <h3>Requested by members</h3>
+      <div className="rows">
+        {rows.map((r) => (
+          <div key={r.id} className="row">
+            {r.imageUrl && <img className="artist-pic" src={r.imageUrl} alt="" width={48} height={48} referrerPolicy="no-referrer" />}
+            <div className="min0 grow">
+              <div className="truncate strong">{r.name}</div>
+              <div className="truncate muted">
+                {r.userName} · {timeAgo(r.createdAt)}
+              </div>
+            </div>
+            <button className="btn-pill" onClick={() => void decide(r.id, 'approve')}>
+              Approve all songs
+            </button>
+            <button className="btn-pill ghost" onClick={() => void decide(r.id, 'reject')}>
+              Reject
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  )
 }
 
 /** Find an artist and queue their whole catalogue for download in one go. */
@@ -75,6 +127,7 @@ export function ArtistsTab() {
 
   return (
     <>
+      <ArtistRequests />
       <p className="muted">Search an artist, then download their whole catalogue. The laptop agent works through the queue when it is on home Wi-Fi.</p>
       <label className="search artist-search">
         <input value={q} placeholder="Artist name" onChange={(e) => setQ(e.target.value)} />
