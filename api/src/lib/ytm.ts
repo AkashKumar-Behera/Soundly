@@ -99,3 +99,77 @@ export async function ytmRadio(videoId: string, limit = 25): Promise<YtmTrack[]>
   }
   return out
 }
+
+export interface YtmArtist {
+  browseId: string
+  name: string
+  subtitle: string
+  thumbnail: string
+}
+
+const ARTISTS_FILTER = 'EgWKAQIgAWoMEA4QChADEAQQCRAF'
+
+export async function ytmArtists(q: string): Promise<YtmArtist[]> {
+  const data = await call('search', { query: q, params: ARTISTS_FILTER })
+  const sections: Json[] = data.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents ?? []
+  const out: YtmArtist[] = []
+  for (const it of sections.flatMap((s) => s.musicShelfRenderer?.contents ?? [])) {
+    const r = it.musicResponsiveListItemRenderer
+    const browseId: string | undefined = r?.navigationEndpoint?.browseEndpoint?.browseId
+    if (!browseId?.startsWith('UC')) continue
+    const col = (i: number): string => (r.flexColumns?.[i]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs ?? []).map((x: Json) => x.text).join('')
+    out.push({ browseId, name: col(0), subtitle: col(1).replace(/^Artist\s*•\s*/, ''), thumbnail: bigArt(r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.at(-1)?.url, 226) })
+  }
+  return out.slice(0, 6)
+}
+
+function rowToTrack(r: Json): YtmTrack | null {
+  const youtubeId: string | undefined = r?.playlistItemData?.videoId
+  if (!youtubeId) return null
+  const text = (i: number): string => (r.flexColumns?.[i]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs ?? []).map((x: Json) => x.text).join('')
+  return {
+    youtubeId,
+    title: text(0),
+    channel: text(1),
+    durationSec: parseClock(r.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text?.runs?.[0]?.text),
+    category: 'Music',
+    thumbnail: bigArt(r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.at(-1)?.url, 226),
+  }
+}
+
+/** Every song of an artist: the artist page's "Songs" list, followed through its continuation pages. */
+export async function ytmArtistSongs(browseId: string, max = 300): Promise<YtmTrack[]> {
+  const page = await call('browse', { browseId })
+  const shelves: Json[] = page.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents ?? []
+  const songs = shelves.find((s) => s.musicShelfRenderer)?.musicShelfRenderer
+  const more = songs?.title?.runs?.[0]?.navigationEndpoint?.browseEndpoint ?? songs?.bottomEndpoint?.browseEndpoint
+
+  const out: YtmTrack[] = []
+  const seen = new Set<string>()
+  const take = (rows: Json[]) => {
+    for (const row of rows) {
+      const t = rowToTrack(row.musicResponsiveListItemRenderer)
+      if (t && !seen.has(t.youtubeId)) {
+        seen.add(t.youtubeId)
+        out.push(t)
+      }
+    }
+  }
+
+  if (!more) {
+    take(songs?.contents ?? [])
+    return out.slice(0, max)
+  }
+
+  const first = await call('browse', { browseId: more.browseId, params: more.params })
+  const shelf = first.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.musicPlaylistShelfRenderer
+  take(shelf?.contents ?? [])
+  let token: string | undefined = shelf?.continuations?.[0]?.nextContinuationData?.continuation
+  for (let i = 0; token && out.length < max && i < 12; i++) {
+    const next = await call('browse', { continuation: token })
+    const cont = next.continuationContents?.musicPlaylistShelfContinuation
+    take(cont?.contents ?? [])
+    token = cont?.continuations?.[0]?.nextContinuationData?.continuation
+  }
+  return out.slice(0, max)
+}

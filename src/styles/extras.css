@@ -526,3 +526,48 @@ img {
   letter-spacing: normal;
   text-transform: none;
 }
+
+.artist-search {
+  max-width: 420px;
+  margin: 12px 0;
+}
+.artist-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.artist-row img {
+  border-radius: 50%;
+  object-fit: cover;
+}
+.artist-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0;
+}
+.artist-head h3 {
+  margin: 0;
+}
+.artist-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.artist-track.have {
+  opacity: 0.55;
+}
+.artist-track input {
+  accent-color: var(--accent);
+}
+
+.yt-item.playable {
+  cursor: pointer;
+}
+.yt-item.playable:hover {
+  background: var(--panel-2);
+}

@@ -1,6 +1,7 @@
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { useLibrary, useRole } from '../../store/library'
 import { ActivityTab } from './ActivityTab'
+import { ArtistsTab } from './ArtistsTab'
 import { InvitesTab } from './InvitesTab'
 import { LyricsTab } from './LyricsTab'
 import { Overview } from './Overview'
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'queue', label: 'Queue' },
   { id: 'songs', label: 'Songs' },
+  { id: 'artists', label: 'Artists' },
   { id: 'lyrics', label: 'Lyrics' },
   { id: 'users', label: 'Users' },
   { id: 'invites', label: 'Invites' },
@@ -44,6 +46,7 @@ export function Admin() {
       {tab === 'overview' && <Overview goTo={go} />}
       {tab === 'queue' && <QueueTab />}
       {tab === 'songs' && <SongsTab />}
+      {tab === 'artists' && <ArtistsTab />}
       {tab === 'lyrics' && <LyricsTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'invites' && <InvitesTab />}
