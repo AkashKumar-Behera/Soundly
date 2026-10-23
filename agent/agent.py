@@ -35,7 +35,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -63,6 +63,7 @@ def load_config(path: Path) -> dict:
     cfg.setdefault('poll_seconds', 15)  # used only while the push connection is down
     cfg.setdefault('safety_poll_seconds', 300)  # slow safety net while push is up
     cfg.setdefault('use_push', True)
+    cfg.setdefault('parallel_downloads', 10)  # songs downloaded and converted at the same time
     cfg.setdefault('heartbeat_seconds', 30)
     cfg.setdefault('max_duration_sec', 1200)
     cfg.setdefault('home_ssids', [])
@@ -329,9 +330,24 @@ def process_job(api: Api, cfg: dict, job: dict) -> None:
 
 class State:
     def __init__(self) -> None:
-        self.job_id: str | None = None
+        self.active: list[str] = []  # jobs running right now, one per busy download slot
+        self.lock = threading.Lock()
         self.on_home = False
         self.push_connected = False
+
+    @property
+    def job_id(self) -> str | None:
+        with self.lock:
+            return self.active[0] if self.active else None
+
+    def start(self, job_id: str) -> None:
+        with self.lock:
+            self.active.append(job_id)
+
+    def finish(self, job_id: str) -> None:
+        with self.lock:
+            if job_id in self.active:
+                self.active.remove(job_id)
 
 
 def ws_url(cfg: dict) -> str:
@@ -342,7 +358,7 @@ def ws_url(cfg: dict) -> str:
 class Push(threading.Thread):
     """Outbound WebSocket to the Worker. Sets `wake` whenever the server says a job is waiting."""
 
-    def __init__(self, cfg: dict, state: State, wake: threading.Event, stop: threading.Event):
+    def __init__(self, cfg: dict, state: State, wake: 'Wake', stop: threading.Event):
         super().__init__(daemon=True)
         self.cfg, self.state, self.wake, self.stop = cfg, state, wake, stop
         self.app = None
@@ -415,11 +431,79 @@ def heartbeat_loop(api: Api, cfg: dict, state: State, stop: threading.Event) -> 
         stop.wait(cfg['heartbeat_seconds'])
 
 
+class Wake:
+    """Wakes every idle worker at once. Each waits for the counter to move past what it saw before it last looked."""
+
+    def __init__(self) -> None:
+        self.cond = threading.Condition()
+        self.n = 0
+
+    def set(self) -> None:
+        with self.cond:
+            self.n += 1
+            self.cond.notify_all()
+
+    def wait(self, timeout: float, seen: int) -> int:
+        with self.cond:
+            self.cond.wait_for(lambda: self.n != seen, timeout)
+            return self.n
+
+
+def run_job(api: Api, cfg: dict, state: State, job: dict) -> None:
+    state.start(job['id'])
+    try:
+        process_job(api, cfg, job)
+    except JobError as e:
+        log.error('job %s failed%s: %s', job['id'][:8], ' (fatal)' if e.fatal else ' (will retry)', e)
+        _report_failure(api, job['id'], str(e), e.fatal)
+    except requests.RequestException as e:
+        log.error('job %s upload/API error: %s', job['id'][:8], e)
+        _report_failure(api, job['id'], f'network: {e}'[:280], False)
+    except KeyboardInterrupt:
+        _report_failure(api, job['id'], 'agent stopped', False)
+        raise
+    except Exception as e:  # noqa: BLE001 - one bad job must not kill the agent
+        log.exception('job %s crashed', job['id'][:8])
+        _report_failure(api, job['id'], f'agent error: {e}'[:280], False)
+    finally:
+        state.finish(job['id'])
+
+
+def worker(n: int, cfg: dict, state: State, wake: Wake, stop: threading.Event, once: bool) -> None:
+    """One download slot: claim a job, process it, repeat. Several of these run side by side."""
+    api = Api(cfg)  # own HTTP session per slot
+    backoff = cfg['poll_seconds']
+    while not stop.is_set():
+        if not state.on_home:
+            stop.wait(cfg['poll_seconds'])  # the main thread keeps state.on_home current
+            continue
+        seen = wake.n
+        try:
+            job = api.claim()
+            backoff = cfg['poll_seconds']
+        except requests.RequestException as e:
+            backoff = min(backoff * 2, 300)
+            log.warning('slot %d cannot reach API (%s), retrying in %ss', n, e, backoff)
+            stop.wait(backoff)
+            continue
+
+        if job is None:
+            if once:
+                return
+            # Queue drained: sleep until the server says something is waiting (or the safety check).
+            wake.wait(cfg['safety_poll_seconds'] if state.push_connected else cfg['poll_seconds'], seen)
+            continue
+
+        run_job(api, cfg, state, job)
+        if once:
+            return
+
+
 def run(cfg: dict, once: bool) -> None:
     api = Api(cfg)
     state = State()
     stop = threading.Event()
-    wake = threading.Event()
+    wake = Wake()
     state.on_home = on_home_network(cfg)  # so the first status report is already correct
     threading.Thread(target=heartbeat_loop, args=(api, cfg, state, stop), daemon=True).start()
     push: Push | None = None
@@ -428,65 +512,30 @@ def run(cfg: dict, once: bool) -> None:
         push.start()
     elif cfg['use_push']:
         log.warning('websocket-client is not installed (pip install websocket-client); polling instead')
-    log.info('agent %s started, API %s, home networks: %s, mode: %s', VERSION, cfg['api_url'], cfg['home_ssids'] or 'any', 'push' if push else 'polling')
+    slots = 1 if once else max(1, min(int(cfg['parallel_downloads']), 16))
+    log.info(
+        'agent %s started, API %s, home networks: %s, mode: %s, %d parallel download%s',
+        VERSION, cfg['api_url'], cfg['home_ssids'] or 'any', 'push' if push else 'polling', slots, '' if slots == 1 else 's',
+    )
 
-    def idle(seconds: float) -> None:
-        """Sleep until the server wakes us, or `seconds` pass (a safety net), whichever is first."""
-        wake.wait(seconds)
-        wake.clear()
-
+    threads = [threading.Thread(target=worker, args=(i + 1, cfg, state, wake, stop, once), daemon=True) for i in range(slots)]
+    for t in threads:
+        t.start()
     was_home: bool | None = None
-    backoff = cfg['poll_seconds']
     try:
-        while not stop.is_set():
+        while any(t.is_alive() for t in threads):
             state.on_home = on_home_network(cfg)
             if state.on_home != was_home:
                 log.info('network: %s (%s)', 'home, working' if state.on_home else 'not home, paused', current_ssid() or 'no wifi')
                 was_home = state.on_home
-            if not state.on_home:
-                idle(cfg['poll_seconds'])  # re-check the network every few seconds, push or not
-                continue
-
-            try:
-                job = api.claim()
-                backoff = cfg['poll_seconds']
-            except requests.RequestException as e:
-                backoff = min(backoff * 2, 300)
-                log.warning('cannot reach API (%s), retrying in %ss', e, backoff)
-                stop.wait(backoff)
-                continue
-
-            if job is None:
-                if once:
-                    log.info('queue is empty')
-                    return
-                # Queue drained: wait for a push (or the slow safety check; fast polling only without push).
-                idle(cfg['safety_poll_seconds'] if state.push_connected else cfg['poll_seconds'])
-                continue
-
-            state.job_id = job['id']
-            try:
-                process_job(api, cfg, job)
-            except JobError as e:
-                log.error('job %s failed%s: %s', job['id'][:8], ' (fatal)' if e.fatal else ' (will retry)', e)
-                _report_failure(api, job['id'], str(e), e.fatal)
-            except requests.RequestException as e:
-                log.error('job %s upload/API error: %s', job['id'][:8], e)
-                _report_failure(api, job['id'], f'network: {e}'[:280], False)
-            except KeyboardInterrupt:
-                _report_failure(api, job['id'], 'agent stopped', False)
-                raise
-            except Exception as e:  # noqa: BLE001 - one bad job must not kill the agent
-                log.exception('job %s crashed', job['id'][:8])
-                _report_failure(api, job['id'], f'agent error: {e}'[:280], False)
-            finally:
-                state.job_id = None
-            if once:
-                return
+                if state.on_home:
+                    wake.set()  # back home: every slot looks for work right away
+            time.sleep(cfg['poll_seconds'] if not once else 1)
     except KeyboardInterrupt:
         log.info('stopping')
     finally:
         stop.set()
+        wake.set()
         if push is not None:
             push.close()
 
