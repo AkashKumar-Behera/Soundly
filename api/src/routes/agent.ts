@@ -113,15 +113,18 @@ agent.post('/jobs/:id/complete', async (c) => {
   return c.json({ songId })
 })
 
-/** Failed jobs retry automatically until 3 attempts, then wait for an admin. */
+/**
+ * Failed jobs retry automatically until 3 attempts, then wait for an admin. `fatal` (private video, too long,
+ * live stream...) skips the retries since another attempt cannot succeed.
+ */
 agent.post('/jobs/:id/fail', async (c) => {
-  const body = await c.req.json<{ error?: string }>().catch(() => ({}) as { error?: string })
+  const body = await c.req.json<{ error?: string; fatal?: boolean }>().catch(() => ({}) as { error?: string; fatal?: boolean })
   await c.env.DB.prepare(
     `UPDATE download_jobs
-     SET status = CASE WHEN attempts >= 3 THEN 'failed' ELSE 'queued' END, error = ?, updated_at = datetime('now')
-     WHERE id = ? AND status IN ('downloading', 'uploading')`,
+     SET status = CASE WHEN ?2 = 1 OR attempts >= 3 THEN 'failed' ELSE 'queued' END, error = ?1, updated_at = datetime('now')
+     WHERE id = ?3 AND status IN ('downloading', 'uploading')`,
   )
-    .bind((body.error ?? 'unknown error').slice(0, 300), c.req.param('id'))
+    .bind((body.error ?? 'unknown error').slice(0, 300), body.fatal ? 1 : 0, c.req.param('id'))
     .run()
   return c.json({ ok: true })
 })

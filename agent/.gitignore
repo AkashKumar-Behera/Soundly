@@ -1,0 +1,4 @@
+config.json
+config.local.json
+agent.log*
+__pycache__/

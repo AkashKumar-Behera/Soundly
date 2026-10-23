@@ -8,6 +8,8 @@ export interface Env {
   PUBLIC_URL: string
   GOOGLE_CLIENT_ID: string
   GOOGLE_CLIENT_SECRET: string
+  /** YouTube Data API v3 key, a Wrangler secret. Without it, YouTube search answers 503. */
+  YOUTUBE_API_KEY: string
   AGENT_TOKEN: string
 }
 

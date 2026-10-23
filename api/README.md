@@ -62,6 +62,7 @@ opaque, HttpOnly, SameSite=Lax cookie; D1 stores its SHA-256, so a database leak
 | `GET/PUT/DELETE /api/likes[/:songId]` | user | liked songs |
 | `POST /api/plays`, `GET /api/plays/recent` | user | play history |
 | `GET/POST /api/playlists`, `/:id`, `/:id/songs` | user | playlists |
+| `GET /api/youtube/search?q=` | member+ | real YouTube results (YouTube Data API), marked if already in the library or requested |
 | `POST/GET /api/requests` | member+ | request a YouTube song, list your requests |
 | `GET /api/admin/requests`, `POST .../:id/approve\|reject\|retry` | admin | approval queue |
 | `GET /api/admin/stats`, `GET/PATCH /api/admin/users`, `GET/POST /api/admin/invites` | admin | dashboard, users, invites |
@@ -73,6 +74,17 @@ opaque, HttpOnly, SameSite=Lax cookie; D1 stores its SHA-256, so a database leak
 - Already in the library returns `already_available`; already queued returns `already_requested`.
 - Trusted users and admins go straight to `queued`; everyone else starts as `pending_approval`.
 - Non-music (`category` not Music) or longer than `max_duration_sec` is flagged and always needs an admin.
+
+### YouTube search
+
+The Worker calls the YouTube Data API v3 with the `YOUTUBE_API_KEY` secret, so search works even when the laptop is
+off. `search.list` costs 100 of the 10,000 free daily quota units, so results are cached for a day, each user gets
+20 searches a day and everyone together 90 (`search_limit` / `search_quota` errors). Setup: enable *YouTube Data API v3*
+in the Google Cloud project, create an API key restricted to that API, then
+`npx wrangler secret put YOUTUBE_API_KEY`. Without the key the endpoint answers `503 youtube_not_configured`.
+
+Each result carries the real category and duration, so the request rules below (non-music or very long videos need an
+admin) work on real data.
 
 ### Job states
 

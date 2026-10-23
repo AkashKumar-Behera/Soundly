@@ -1,0 +1,11 @@
+{
+  "api_url": "https://soundly-api.YOUR-NAME.workers.dev/api",
+  "token_file": "../api/.prod-agent-token",
+  "home_ssids": ["YOUR-HOME-WIFI-NAME"],
+  "allow_ethernet": false,
+  "ffmpeg": "ffmpeg",
+  "poll_seconds": 15,
+  "heartbeat_seconds": 30,
+  "max_duration_sec": 1200,
+  "agent_id": "laptop"
+}

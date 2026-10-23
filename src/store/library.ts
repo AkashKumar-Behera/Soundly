@@ -47,6 +47,45 @@ export interface RequestInput {
 
 export type RequestResult = { ok: true; status: RequestStatus } | { ok: false; error: string; songId?: string }
 
+export interface YoutubeResult {
+  youtubeId: string
+  title: string
+  channel: string
+  durationSec: number
+  category: string
+  thumbnail: string
+  /** Set when the song is already in the library. */
+  songId: string | null
+  /** Set while a request for this video is pending, queued or downloading. */
+  requestStatus: string | null
+}
+
+export type YoutubeSearch = { ok: true; results: YoutubeResult[] } | { ok: false; error: string }
+
+/** Deterministic 11-character id so a demo result always maps to the same request. */
+function fakeVideoId(seed: string): string {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619) >>> 0
+  return (h.toString(36) + (h ^ 0x9e3779b9).toString(36) + 'abcdefghijk').slice(0, 11)
+}
+
+function demoYoutube(q: string): YoutubeResult[] {
+  return [
+    { suffix: '(Official Audio)', channel: `${q} - Topic`, durationSec: 222 },
+    { suffix: '| Lyrics', channel: 'Lyrics Hub', durationSec: 220 },
+    { suffix: '(Live Session)', channel: 'Live Sessions', durationSec: 250 },
+  ].map((v) => ({
+    youtubeId: fakeVideoId(`${q} ${v.suffix}`),
+    title: `${q} ${v.suffix}`,
+    channel: v.channel,
+    durationSec: v.durationSec,
+    category: 'Music',
+    thumbnail: '',
+    songId: null,
+    requestStatus: null,
+  }))
+}
+
 interface ApiSong {
   id: string
   title: string
@@ -96,6 +135,7 @@ interface LibraryState {
   toggleLike: (songId: string) => Promise<void>
   getPlaylist: (id: string) => Promise<{ playlist: Playlist; songs: Song[] } | null>
   searchSongs: (q: string) => Promise<Song[]>
+  searchYoutube: (q: string) => Promise<YoutubeSearch>
   createRequest: (input: RequestInput) => Promise<RequestResult>
   loadRequests: () => Promise<void>
   decideRequest: (id: string, decision: 'approve' | 'reject') => Promise<void>
@@ -204,6 +244,16 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     }
     const d = await api<{ songs: ApiSong[] }>(`/songs?q=${encodeURIComponent(q)}&limit=50`)
     return d.songs.map(toSong)
+  },
+
+  searchYoutube: async (q) => {
+    if (get().mode === 'demo') return { ok: true, results: demoYoutube(q) }
+    try {
+      const d = await api<{ results: YoutubeResult[] }>(`/youtube/search?q=${encodeURIComponent(q)}`)
+      return { ok: true, results: d.results }
+    } catch (e) {
+      return { ok: false, error: e instanceof ApiError ? e.code : 'network' }
+    }
   },
 
   createRequest: async (input) => {
