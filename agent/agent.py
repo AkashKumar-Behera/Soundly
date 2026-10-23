@@ -4,7 +4,7 @@
 Runs on your own computer and keeps ONE outbound WebSocket open to the Soundly Worker (nothing here is exposed to
 the internet). The moment a request becomes claimable the Worker pushes a "wake" message, and the agent does:
 
-    claim the oldest queued request -> download with yt-dlp -> mp3 + cover -> upload to R2 -> complete
+    claim the oldest queued request -> download with yt-dlp -> m4a (AAC) + cover -> upload to R2 -> complete
 
 There is no polling while the push connection is up (only a slow safety check every few minutes). If the push
 channel is unavailable the agent falls back to polling every few seconds, so it never gets stuck.
@@ -36,7 +36,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.5.1'
+VERSION = '0.6.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -67,6 +67,7 @@ FATAL_HINTS = (
     'premieres in', 'live event will begin',
 )
 THUMB_EXTS = {'.webp', '.jpg', '.jpeg', '.png'}
+AUDIO_EXTS = {'.m4a', '.mp4', '.aac', '.webm', '.opus', '.ogg', '.mp3'}
 
 
 class JobError(Exception):
@@ -248,6 +249,24 @@ def make_cover(ffmpeg: str, source: Path, dest: Path) -> bool:
         return False
 
 
+def make_m4a(ffmpeg: str, source: Path, dest: Path) -> Path:
+    """Put the audio in a streamable .m4a. AAC is just re-wrapped (no quality loss); anything else becomes AAC 128k."""
+    base = [ffmpeg, '-y', '-loglevel', 'error', '-i', str(source), '-vn', '-map_metadata', '-1']
+    tail = ['-movflags', '+faststart', str(dest)]
+    attempts = []
+    if source.suffix.lower() in {'.m4a', '.mp4', '.aac'}:
+        attempts.append(base + ['-c:a', 'copy'] + tail)
+    attempts.append(base + ['-c:a', 'aac', '-b:a', '128k'] + tail)
+    for cmd in attempts:
+        try:
+            if subprocess.run(cmd, timeout=300).returncode == 0 and dest.exists() and dest.stat().st_size > 0:
+                return dest
+        except (OSError, subprocess.SubprocessError):
+            pass
+        dest.unlink(missing_ok=True)
+    raise JobError('could not prepare the audio file', fatal=False)
+
+
 def download(cfg: dict, job: dict, workdir: Path, rep: Reporter | None = None) -> tuple[dict, Path, Path | None]:
     # Overall bar: download 0-65%, MP3 conversion 65-75%, upload 75-97%, saving to 100%.
     def on_download(d: dict) -> None:
@@ -271,11 +290,10 @@ def download(cfg: dict, job: dict, workdir: Path, rep: Reporter | None = None) -
         'no_warnings': True,
         'noprogress': True,
         'noplaylist': True,
-        'format': 'bestaudio/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',  # YouTube's own AAC stream: no re-encode, plays on every device
         'outtmpl': str(workdir / '%(id)s.%(ext)s'),
         'ffmpeg_location': cfg['ffmpeg'],
         'writethumbnail': True,
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -292,9 +310,12 @@ def download(cfg: dict, job: dict, workdir: Path, rep: Reporter | None = None) -
         message = re.sub(r'\x1b\[[0-9;]*m', '', str(e))
         raise JobError(message[:280], fatal=any(h in message.lower() for h in FATAL_HINTS)) from e
 
-    mp3 = next(iter(sorted(workdir.glob('*.mp3'))), None)
-    if mp3 is None:
-        raise JobError('mp3 was not produced', fatal=False)
+    source = next((p for p in sorted(workdir.iterdir()) if p.suffix.lower() in AUDIO_EXTS), None)
+    if source is None:
+        raise JobError('no audio was downloaded', fatal=False)
+    if rep is not None:
+        rep.send('converting', 0.70, None, None, force=True)
+    mp3 = make_m4a(cfg['ffmpeg'], source, workdir / 'audio_out.m4a')
     thumb = next((p for p in sorted(workdir.iterdir()) if p.suffix.lower() in THUMB_EXTS), None)
     return info, mp3, thumb
 
@@ -315,8 +336,8 @@ def process_job(api: Api, cfg: dict, job: dict) -> None:
             eta = (size - sent) / speed if speed else None
             rep.send('uploading', 0.75 + 0.22 * (sent / size if size else 1), eta, speed)
 
-        song_key = f'songs/{vid}.mp3'
-        api.upload(song_key, mp3, 'audio/mpeg', on_upload)
+        song_key = f'songs/{vid}.m4a'
+        api.upload(song_key, mp3, 'audio/mp4', on_upload)
 
         thumb_key = None
         if thumb is not None:
@@ -336,7 +357,7 @@ def process_job(api: Api, cfg: dict, job: dict) -> None:
                 'r2Key': song_key,
                 'thumbKey': thumb_key,
                 'sizeBytes': mp3.stat().st_size,
-                'bitrateKbps': 192,
+                'bitrateKbps': 128,
             },
         )
         log.info('job %s done -> song %s (%.1f MB%s)', job['id'][:8], result.get('songId'), mp3.stat().st_size / 1e6, ', cover' if thumb_key else '')

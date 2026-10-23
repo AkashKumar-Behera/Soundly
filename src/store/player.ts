@@ -62,7 +62,7 @@ interface PlayerState {
 
 // One audio element for the whole app, kept outside React so re-renders never touch playback.
 const audio = new Audio()
-audio.preload = 'metadata'
+audio.preload = 'auto'
 audio.volume = 0.8
 
 // Report a play to the API once a song has been listened to for a while (feeds history and analytics).
@@ -72,12 +72,41 @@ function flushPlay() {
   playing = null
 }
 
+/** play() can be refused while the app is in the background (e.g. right after a track ended). Try again a few times. */
+function startPlayback(tries = 0) {
+  audio.play().catch(() => {
+    if (tries < 3) setTimeout(() => startPlayback(tries + 1), 400 * (tries + 1))
+  })
+}
+
+let recoveries = 0
+let stallTimer: ReturnType<typeof setTimeout> | undefined
+/** The stream died mid-song (network dropped while the phone was locked): reload it and carry on from the same second. */
+function recoverPlayback(): boolean {
+  if (!playing || recoveries >= 3 || !navigator.onLine) return false
+  recoveries++
+  const at = audio.currentTime
+  const src = audio.src
+  audio.addEventListener(
+    'loadedmetadata',
+    () => {
+      audio.currentTime = at
+      startPlayback()
+    },
+    { once: true },
+  )
+  audio.src = src
+  audio.load()
+  return true
+}
+
 function load(song: Song) {
   flushPlay()
   playing = song
   audio.src = song.src
   audio.currentTime = 0
-  void audio.play().catch(() => {})
+  recoveries = 0
+  startPlayback()
   setMediaMetadata(song)
   const { queue, index } = usePlayer.getState()
   if (!inRoom() && queue.length - index <= 3) queueLowHook?.(song)
@@ -244,6 +273,14 @@ audio.addEventListener('durationchange', () => usePlayer.setState({ duration: au
 let failures = 0
 audio.addEventListener('playing', () => {
   failures = 0
+  clearTimeout(stallTimer)
+})
+// Waiting for data for 10 seconds while we should be playing: kick the stream.
+audio.addEventListener('waiting', () => {
+  clearTimeout(stallTimer)
+  stallTimer = setTimeout(() => {
+    if (!audio.paused && audio.readyState < 3) recoverPlayback()
+  }, 10000)
 })
 audio.addEventListener('play', () => {
   usePlayer.setState({ playing: true })
@@ -254,6 +291,7 @@ audio.addEventListener('pause', () => {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'
 })
 audio.addEventListener('error', () => {
+  if (audio.currentTime > 1 && recoverPlayback()) return
   const { queue, index } = usePlayer.getState()
   const song = queue[index]
   if (!song) return
