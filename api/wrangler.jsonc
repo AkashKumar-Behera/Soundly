@@ -20,6 +20,6 @@
     "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173",
     "PUBLIC_URL": "https://soundly-api.akashkumar48874.workers.dev",
     // Public identifier from Google Cloud Console (not a secret). GOOGLE_CLIENT_SECRET is a Wrangler secret.
-    "GOOGLE_CLIENT_ID": ""
+    "GOOGLE_CLIENT_ID": "11957689051-eictl1s3bhb368sfdqfkm8gqbqsqa2fa.apps.googleusercontent.com"
   }
 }
