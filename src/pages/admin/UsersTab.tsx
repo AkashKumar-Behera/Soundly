@@ -108,6 +108,9 @@ export function UsersTab() {
             <div className="user-controls">
               <label>
                 Daily requests
+                {u.role === 'admin' ? (
+                  <span className="unlimited">Unlimited</span>
+                ) : (
                 <input
                   type="number"
                   min={0}
@@ -116,6 +119,7 @@ export function UsersTab() {
                   key={`${u.id}-${u.dailyRequestLimit}`}
                   onBlur={(e) => Number(e.target.value) !== u.dailyRequestLimit && void patch(u, { dailyRequestLimit: Number(e.target.value) })}
                 />
+                )}
               </label>
               <label className="switch">
                 <input type="checkbox" checked={!!u.canRequestDirect} disabled={busy === u.id} onChange={(e) => void patch(u, { canRequestDirect: e.target.checked })} />

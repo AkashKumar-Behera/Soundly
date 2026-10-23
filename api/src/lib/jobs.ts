@@ -30,7 +30,7 @@ export async function createJob(db: D1Database, user: User, input: JobInput, opt
   const have = await db.prepare('SELECT id FROM songs WHERE youtube_id = ?').bind(youtubeId).first<{ id: string }>()
   if (have) return { ok: false, error: 'already_available', songId: have.id }
 
-  if (!opts.skipDailyLimit) {
+  if (!opts.skipDailyLimit && user.role !== 'admin') {
     const used = await db.prepare("SELECT COUNT(*) AS n FROM download_jobs WHERE user_id = ? AND created_at >= date('now')").bind(user.id).first<{ n: number }>()
     if ((used?.n ?? 0) >= user.daily_request_limit) return { ok: false, error: 'daily_limit_reached', limit: user.daily_request_limit }
   }
