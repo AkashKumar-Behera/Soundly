@@ -41,8 +41,36 @@ function generatedCover(hue: number, hue2: number): string {
 }
 
 /** Artwork for the lock screen, notification shade and media keys. */
+const squareCache = new Map<string, string>()
+
+/** YouTube thumbnails are 16:9 with the cover in the middle; the lock screen letterboxes them, so crop to a square. */
+export async function squareArtwork(thumbUrl: string): Promise<MediaImage[] | null> {
+  try {
+    let src = squareCache.get(thumbUrl)
+    if (!src) {
+      const img = new Image()
+      img.src = thumbUrl
+      await img.decode()
+      const side = Math.min(img.naturalWidth, img.naturalHeight)
+      const out = Math.min(512, side)
+      const c = document.createElement('canvas')
+      c.width = c.height = out
+      c.getContext('2d')?.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out)
+      src = c.toDataURL('image/jpeg', 0.9)
+      squareCache.set(thumbUrl, src)
+    }
+    return [{ src, sizes: '512x512', type: 'image/jpeg' }]
+  } catch {
+    return null
+  }
+}
+
 export function mediaArtwork(song: Song): MediaImage[] {
-  if (song.thumbUrl) return [{ src: new URL(song.thumbUrl, window.location.origin).href, sizes: '480x360', type: 'image/webp' }]
+  if (song.thumbUrl) {
+    const cached = squareCache.get(song.thumbUrl)
+    if (cached) return [{ src: cached, sizes: '512x512', type: 'image/jpeg' }]
+    return [{ src: new URL(song.thumbUrl, window.location.origin).href, sizes: '480x360', type: 'image/webp' }]
+  }
   const src = generatedCover(song.hue, song.hue2)
   return src ? [{ src, sizes: '512x512', type: 'image/png' }] : []
 }

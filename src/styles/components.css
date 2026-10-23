@@ -919,7 +919,7 @@
 }
 .room-pill {
   position: fixed;
-  top: 10px;
+  top: calc(10px + env(safe-area-inset-top));
   right: 14px;
   z-index: 65;
   display: flex;

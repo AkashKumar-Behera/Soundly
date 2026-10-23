@@ -10,7 +10,7 @@ import { useRoom } from '../store/room'
 import { useUi } from '../store/ui'
 import { Cover } from './Cover'
 import { CurrentTime, ProgressBar, TotalTime } from './ProgressBar'
-import { Visualizer } from './Visualizer'
+import { coverHues } from '../lib/coverColor'
 
 type Tab = 'lyrics' | 'queue'
 
@@ -175,8 +175,20 @@ function Content() {
   const setRoomModal = useUi((s) => s.setRoomModal)
   const inRoom = useRoom((s) => !!s.code)
   const [tab, setTab] = useState<Tab>('lyrics')
+  const [hues, setHues] = useState<{ url: string; h: [number, number] } | null>(null)
+  const thumb = song?.thumbUrl
+
+  useEffect(() => {
+    if (!thumb) return
+    let live = true
+    coverHues(thumb).then((h) => live && h && setHues({ url: thumb, h }))
+    return () => {
+      live = false
+    }
+  }, [thumb])
 
   if (!song) return null
+  const [h1, h2] = hues && hues.url === thumb ? hues.h : [song.hue, song.hue2]
 
   const art =
     playerStyle === 'vinyl' ? (
@@ -192,7 +204,7 @@ function Content() {
   return (
     <div
       className={`np-inner ps-${playerStyle}`}
-      style={{ '--h1': song.hue, '--h2': song.hue2 } as CSSProperties}
+      style={{ '--h1': h1, '--h2': h2 } as CSSProperties}
     >
       <div className="np-head">
         <button className="icon-btn" aria-label="Close now playing" onClick={() => close(false)}>
@@ -245,7 +257,6 @@ function Content() {
               {repeat === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
             </button>
           </div>
-          <Visualizer />
         </div>
 
         <div className="np-side">

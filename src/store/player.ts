@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { logPlay } from '../api/client'
 import type { Song } from '../data/mock'
-import { mediaArtwork } from '../lib/artwork'
+import { mediaArtwork, squareArtwork } from '../lib/artwork'
 import { useUi } from './ui'
 
 export type Repeat = 'off' | 'all' | 'one'
@@ -90,6 +90,11 @@ function setMediaMetadata(song: Song) {
     album: song.album,
     artwork: mediaArtwork(song),
   })
+  if (song.thumbUrl) {
+    void squareArtwork(song.thumbUrl).then((artwork) => {
+      if (artwork && playing?.id === song.id && navigator.mediaSession.metadata) navigator.mediaSession.metadata.artwork = artwork
+    })
+  }
 }
 
 export const usePlayer = create<PlayerState>((set, get) => ({
