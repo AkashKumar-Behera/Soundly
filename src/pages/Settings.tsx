@@ -20,7 +20,7 @@ const DEV_USERS = [
 ]
 
 export function Settings() {
-  const { theme, ui, playerStyle, setTheme, setUi, setPlayerStyle } = useApp()
+  const { theme, ui, playerStyle, autoplay, setTheme, setUi, setPlayerStyle, setAutoplay } = useApp()
   const mode = useLibrary((s) => s.mode)
   const me = useLibrary((s) => s.me)
   const demoRole = useLibrary((s) => s.demoRole)
@@ -135,6 +135,22 @@ export function Settings() {
             { value: 'classic', label: 'Classic' },
             { value: 'immersive', label: 'Immersive' },
             { value: 'vinyl', label: 'Vinyl' },
+            { value: 'modern', label: 'Modern' },
+          ]}
+        />
+      </section>
+
+      <section className="setting">
+        <div>
+          <h3>Autoplay similar songs</h3>
+          <p className="muted">When the queue runs low, keep playing songs like the current one. Trusted listeners also get a few new songs downloaded.</p>
+        </div>
+        <Segmented
+          value={autoplay ? 'on' : 'off'}
+          onChange={(v) => setAutoplay(v === 'on')}
+          options={[
+            { value: 'on', label: 'On' },
+            { value: 'off', label: 'Off' },
           ]}
         />
       </section>

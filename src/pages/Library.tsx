@@ -1,4 +1,4 @@
-import { Heart } from 'lucide-react'
+import { Heart, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '../components/Card'
@@ -7,6 +7,7 @@ import type { Song } from '../data/mock'
 import { playPlaylist } from '../lib/playlist'
 import { useLibrary } from '../store/library'
 import { usePlayer } from '../store/player'
+import { useUi } from '../store/ui'
 
 type Filter = 'playlists' | 'songs' | 'liked'
 
@@ -21,6 +22,8 @@ export function Library() {
   const playlists = useLibrary((s) => s.playlists)
   const likedIds = useLibrary((s) => s.liked)
   const getPlaylist = useLibrary((s) => s.getPlaylist)
+  const mode = useLibrary((s) => s.mode)
+  const setCreatePlaylist = useUi((s) => s.setCreatePlaylist)
 
   useEffect(() => {
     if (filter !== 'liked') return
@@ -33,7 +36,14 @@ export function Library() {
 
   return (
     <>
-      <h1 className="page-title">Your Library</h1>
+      <div className="page-title-row">
+        <h1 className="page-title">Your Library</h1>
+        {mode === 'api' && (
+          <button className="btn-pill" onClick={() => setCreatePlaylist(true)}>
+            <Plus size={16} /> New playlist
+          </button>
+        )}
+      </div>
       <div className="chips">
         {(['playlists', 'songs', 'liked'] as Filter[]).map((f) => (
           <button key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>

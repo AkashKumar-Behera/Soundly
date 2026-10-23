@@ -26,6 +26,12 @@ export function setRoomHook(hook: RoomHook | null) {
 }
 const inRoom = () => !!roomHook?.active()
 
+let queueLowHook: ((song: Song) => void) | null = null
+/** Called with the song that just started when 3 or fewer songs remain in the queue (not in listening rooms). */
+export function setQueueLowHook(hook: ((song: Song) => void) | null) {
+  queueLowHook = hook
+}
+
 interface PlayerState {
   queue: Song[]
   index: number
@@ -73,6 +79,8 @@ function load(song: Song) {
   audio.currentTime = 0
   void audio.play().catch(() => {})
   setMediaMetadata(song)
+  const { queue, index } = usePlayer.getState()
+  if (!inRoom() && queue.length - index <= 3) queueLowHook?.(song)
 }
 
 function loadSilently(song: Song) {

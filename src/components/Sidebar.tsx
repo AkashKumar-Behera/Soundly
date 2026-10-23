@@ -1,6 +1,7 @@
 import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings, ShieldCheck, Sparkles } from 'lucide-react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useLibrary, useRole } from '../store/library'
+import { useUi } from '../store/ui'
 import { Cover } from './Cover'
 import { Logo } from './Logo'
 
@@ -13,7 +14,6 @@ const nav = [
 ]
 
 export function Sidebar() {
-  const navigate = useNavigate()
   const likedCount = useLibrary((s) => s.liked.length)
   const playlists = useLibrary((s) => s.playlists)
   const isPro = useLibrary((s) => !!s.me?.isPro)
@@ -41,7 +41,7 @@ export function Sidebar() {
           <Library size={22} />
           Your Library
         </NavLink>
-        <button className="icon-btn" aria-label="Create playlist" onClick={() => navigate('/library')}>
+        <button className="icon-btn" aria-label="Create playlist" onClick={() => useUi.getState().setCreatePlaylist(true)}>
           <Plus size={20} />
         </button>
       </div>

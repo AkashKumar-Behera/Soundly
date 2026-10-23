@@ -1,8 +1,8 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { ChevronDown, Heart, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion, useDragControls } from 'motion/react'
+import type { DragControls } from 'motion/react'
+import { ChevronDown, Heart, MoreHorizontal, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { api, isDemo } from '../api/client'
 import { useApp } from '../store/app'
 import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
@@ -11,158 +11,12 @@ import { useUi } from '../store/ui'
 import { Cover } from './Cover'
 import { CurrentTime, ProgressBar, TotalTime } from './ProgressBar'
 import { coverHues } from '../lib/coverColor'
+import { Lyrics, Queue } from './NpPanels'
+import { ModernPlayer } from './ModernPlayer'
 
 type Tab = 'lyrics' | 'queue'
 
-interface LyricsData {
-  found: boolean
-  instrumental: boolean
-  approx: boolean
-  synced: { t: number; text: string }[] | null
-  plain: string | null
-}
-
-const lyricsCache = new Map<string, LyricsData>()
-const offsetKey = (id: string) => `soundly.lyrics-offset.${id}`
-const loadOffset = (id: string) => {
-  try {
-    return Number(localStorage.getItem(offsetKey(id))) || 0
-  } catch {
-    return 0
-  }
-}
-
-function Lyrics() {
-  const song = useCurrent()
-  const id = song?.id
-  const [data, setData] = useState<LyricsData | null>(null)
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [offset, setOffset] = useState(0)
-  const refs = useRef<(HTMLParagraphElement | null)[]>([])
-
-  useEffect(() => {
-    if (!id) return
-    setOffset(loadOffset(id))
-    const hit = lyricsCache.get(id)
-    if (hit) {
-      setData(hit)
-      setState('ready')
-      return
-    }
-    setData(null)
-    setState('loading')
-    let live = true
-    api<LyricsData>(`/lyrics/${id}`)
-      .then((d) => {
-        lyricsCache.set(id, d)
-        if (live) {
-          setData(d)
-          setState('ready')
-        }
-      })
-      .catch(() => live && setState('error'))
-    return () => {
-      live = false
-    }
-  }, [id])
-
-  const lines = data?.synced
-  // Subscribe to the line index only, so the panel re-renders on a line change and not on every time tick.
-  const active = usePlayer((s) => {
-    if (!lines?.length) return -1
-    const t = s.time + 0.25 + offset
-    let lo = 0
-    let hi = lines.length - 1
-    let at = -1
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1
-      if (lines[mid].t <= t) {
-        at = mid
-        lo = mid + 1
-      } else hi = mid - 1
-    }
-    return at
-  })
-
-  useEffect(() => {
-    if (active >= 0) refs.current[active]?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [active])
-
-  const nudge = (d: number) => {
-    if (!id) return
-    const next = Math.round((offset + d) * 10) / 10
-    setOffset(next)
-    try {
-      localStorage.setItem(offsetKey(id), String(next))
-    } catch {
-      /* private mode: the nudge just lasts for this session */
-    }
-  }
-
-  if (isDemo()) return <div className="lyrics"><small>Lyrics need the live server.</small></div>
-  if (state === 'loading') return <div className="lyrics"><small>Finding lyrics…</small></div>
-  if (state === 'error' || !data) return <div className="lyrics"><small>Could not load lyrics. Try again in a bit.</small></div>
-  if (data.instrumental) return <div className="lyrics"><small>Instrumental. No lyrics here.</small></div>
-  if (!data.found) return <div className="lyrics"><small>No lyrics found for this song.</small></div>
-
-  if (lines?.length) {
-    return (
-      <div className="lyrics">
-        {lines.map((line, i) => (
-          <p
-            key={i}
-            ref={(el) => {
-              refs.current[i] = el
-            }}
-            className={i === active ? 'on' : i < active ? 'past' : ''}
-            onClick={() => usePlayer.getState().seek(Math.max(0, line.t - offset))}
-          >
-            {line.text || '♪'}
-          </p>
-        ))}
-        <div className="lyrics-sync">
-          <button onClick={() => nudge(-0.5)} aria-label="Lyrics earlier">
-            Earlier
-          </button>
-          <span>{offset === 0 ? 'In sync' : `${offset > 0 ? '+' : ''}${offset}s`}</span>
-          <button onClick={() => nudge(0.5)} aria-label="Lyrics later">
-            Later
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="lyrics plain">
-      {data.plain?.split(String.fromCharCode(10)).map((l, i) => (
-        <p key={i}>{l || ' '}</p>
-      ))}
-      <small>{data.approx ? 'Lyrics from another version of this song, so they may differ. Not synced.' : 'Not synced for this song.'}</small>
-    </div>
-  )
-}
-
-function Queue() {
-  const queue = usePlayer((s) => s.queue)
-  const index = usePlayer((s) => s.index)
-  const playAt = usePlayer((s) => s.playAt)
-  return (
-    <div className="np-queue">
-      {queue.map((s, i) => (
-        <button key={`${s.id}-${i}`} className={i === index ? 'on' : ''} onClick={() => playAt(i)}>
-          <Cover hue={s.hue} hue2={s.hue2} thumbUrl={s.thumbUrl} size={40} className="r8" />
-          <div className="min0">
-            <div className="truncate t">{s.title}</div>
-            <div className="truncate a">{s.artist}</div>
-          </div>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function Content() {
+function Content({ controls }: { controls: DragControls }) {
   const song = useCurrent()
   const playing = usePlayer((s) => s.playing)
   const shuffle = usePlayer((s) => s.shuffle)
@@ -173,6 +27,7 @@ function Content() {
   const toggleLike = useLibrary((s) => s.toggleLike)
   const close = useUi((s) => s.setNowPlaying)
   const setRoomModal = useUi((s) => s.setRoomModal)
+  const openMenu = useUi((s) => s.openSongMenu)
   const inRoom = useRoom((s) => !!s.code)
   const [tab, setTab] = useState<Tab>('lyrics')
   const [hues, setHues] = useState<{ url: string; h: [number, number] } | null>(null)
@@ -189,6 +44,9 @@ function Content() {
 
   if (!song) return null
   const [h1, h2] = hues && hues.url === thumb ? hues.h : [song.hue, song.hue2]
+  const grab = (e: React.PointerEvent) => controls.start(e)
+
+  if (playerStyle === 'modern') return <ModernPlayer song={song} h1={h1} h2={h2} grab={grab} />
 
   const art =
     playerStyle === 'vinyl' ? (
@@ -206,19 +64,33 @@ function Content() {
       className={`np-inner ps-${playerStyle}`}
       style={{ '--h1': h1, '--h2': h2 } as CSSProperties}
     >
-      <div className="np-head">
+      <div className="np-head grab" onPointerDown={grab}>
         <button className="icon-btn" aria-label="Close now playing" onClick={() => close(false)}>
           <ChevronDown size={28} />
         </button>
         <span>Playing from your library</span>
-        <button className={`icon-btn ${inRoom ? 'on' : ''}`} aria-label="Listen together" onClick={() => setRoomModal(true)}>
-          <Users size={22} />
-        </button>
+        <div className="np-head-right">
+          <button className={`icon-btn ${inRoom ? 'on' : ''}`} aria-label="Listen together" onClick={() => setRoomModal(true)}>
+            <Users size={22} />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="More options"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              openMenu({ song, x: r.right - 240, y: r.bottom + 6 })
+            }}
+          >
+            <MoreHorizontal size={22} />
+          </button>
+        </div>
       </div>
 
       <div className="np-body">
         <div className="np-main">
-          {art}
+          <div className="grab" onPointerDown={grab}>
+            {art}
+          </div>
           <div className="np-meta">
             <div className="min0">
               <h1 className="truncate">{song.title}</h1>
@@ -277,6 +149,8 @@ function Content() {
 
 export function NowPlaying() {
   const open = useUi((s) => s.nowPlaying)
+  const close = useUi((s) => s.setNowPlaying)
+  const controls = useDragControls()
 
   return (
     <AnimatePresence>
@@ -289,8 +163,16 @@ export function NowPlaying() {
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          drag="y"
+          dragControls={controls}
+          dragListener={false}
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0, bottom: 0.7 }}
+          onDragEnd={(_, info) => {
+            if (info.offset.y > 110 || info.velocity.y > 650) close(false)
+          }}
         >
-          <Content />
+          <Content controls={controls} />
         </motion.div>
       )}
     </AnimatePresence>

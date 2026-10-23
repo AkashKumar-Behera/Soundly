@@ -170,6 +170,10 @@ interface LibraryState {
   previewPlaylist: (listId: string) => Promise<{ ok: true; preview: PlaylistPreview } | { ok: false; error: string }>
   importPlaylist: (listId: string, ids: string[], title: string) => Promise<{ ok: true; result: ImportResult } | { ok: false; error: string }>
   deletePlaylist: (id: string) => Promise<boolean>
+  createPlaylist: (title: string) => Promise<string | null>
+  renamePlaylist: (id: string, title: string) => Promise<boolean>
+  addToPlaylist: (playlistId: string, songId: string) => Promise<boolean>
+  removeFromPlaylist: (playlistId: string, songId: string) => Promise<boolean>
   createRequest: (input: RequestInput) => Promise<RequestResult>
   loadRequests: () => Promise<void>
   decideRequest: (id: string, decision: 'approve' | 'reject') => Promise<void>
@@ -323,6 +327,46 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       return { ok: true, result }
     } catch (e) {
       return { ok: false, error: e instanceof ApiError ? e.code : 'network' }
+    }
+  },
+
+  createPlaylist: async (title) => {
+    try {
+      const r = await api<{ id: string }>('/playlists', { method: 'POST', body: { title } })
+      await get().load()
+      return r.id
+    } catch {
+      return null
+    }
+  },
+
+  renamePlaylist: async (id, title) => {
+    try {
+      await api(`/playlists/${id}`, { method: 'PATCH', body: { title } })
+      await get().load()
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  addToPlaylist: async (playlistId, songId) => {
+    try {
+      await api(`/playlists/${playlistId}/songs`, { method: 'POST', body: { songId } })
+      await get().load()
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  removeFromPlaylist: async (playlistId, songId) => {
+    try {
+      await api(`/playlists/${playlistId}/songs/${songId}`, { method: 'DELETE' })
+      await get().load()
+      return true
+    } catch {
+      return false
     }
   },
 

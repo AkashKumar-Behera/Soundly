@@ -113,6 +113,15 @@ playlists.delete('/:id/songs/:songId', async (c) => {
   return c.json({ ok: true })
 })
 
+playlists.patch('/:id', async (c) => {
+  const body = await c.req.json<{ title?: string }>().catch(() => ({}) as { title?: string })
+  const title = (body.title ?? '').trim().slice(0, 80)
+  if (!title) return c.json({ error: 'title_required' }, 400)
+  const res = await c.env.DB.prepare('UPDATE playlists SET title = ? WHERE id = ? AND owner_id = ?').bind(title, c.req.param('id'), c.get('user').id).run()
+  if (!res.meta.changes) return c.json({ error: 'forbidden' }, 403)
+  return c.json({ ok: true })
+})
+
 playlists.delete('/:id', async (c) => {
   const res = await c.env.DB.prepare('DELETE FROM playlists WHERE id = ? AND owner_id = ?').bind(c.req.param('id'), c.get('user').id).run()
   if (!res.meta.changes) return c.json({ error: 'forbidden' }, 403)

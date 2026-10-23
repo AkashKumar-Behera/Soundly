@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import re
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -34,7 +35,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.3.0'
+VERSION = '0.4.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -186,6 +187,11 @@ class Api:
             body.close()
         r.raise_for_status()
 
+    def songs(self) -> list[dict]:
+        r = self.http.get(f'{self.base}/agent/songs', timeout=30)
+        r.raise_for_status()
+        return r.json()['songs']
+
     def progress(self, job_id: str, stage: str, progress: float, eta: float | None, speed: float | None) -> None:
         self._post(f'/agent/jobs/{job_id}/progress', {'stage': stage, 'progress': progress, 'etaSec': eta, 'speedBps': speed}, timeout=8)
 
@@ -211,7 +217,9 @@ def pick_artist(info: dict) -> str:
 
 
 def make_cover(ffmpeg: str, source: Path, dest: Path) -> bool:
-    cmd = [ffmpeg, '-y', '-loglevel', 'error', '-i', str(source), '-vf', "scale='min(640,iw)':-2", '-quality', '82', str(dest)]
+    # Square, centred crop (YouTube Music thumbnails are 16:9 with the cover in the middle), up to 720px, high quality.
+    vf = "crop='min(iw,ih)':'min(iw,ih)',scale='min(720,iw)':-2"
+    cmd = [ffmpeg, '-y', '-loglevel', 'error', '-i', str(source), '-vf', vf, '-quality', '92', str(dest)]
     try:
         return subprocess.run(cmd, timeout=60).returncode == 0 and dest.exists()
     except (OSError, subprocess.SubprocessError):
@@ -490,15 +498,47 @@ def _report_failure(api: Api, job_id: str, message: str, fatal: bool) -> None:
         log.warning('could not report failure for %s: %s', job_id[:8], e)
 
 
+def refresh_covers(cfg: dict) -> None:
+    """Re-fetches every library cover in the new square, high-quality format and overwrites it in R2 (same keys)."""
+    api = Api(cfg)
+    songs = api.songs()
+    log.info('refreshing %d covers', len(songs))
+    for n, song in enumerate(songs, 1):
+        workdir = Path(tempfile.mkdtemp(prefix='soundly_cover_'))
+        try:
+            opts = {
+                'quiet': True, 'no_warnings': True, 'noplaylist': True, 'skip_download': True, 'writethumbnail': True,
+                'outtmpl': str(workdir / '%(id)s.%(ext)s'), 'ffmpeg_location': cfg['ffmpeg'],
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([f"https://www.youtube.com/watch?v={song['youtubeId']}"])
+            thumb = next((p for p in sorted(workdir.iterdir()) if p.suffix.lower() in THUMB_EXTS), None)
+            cover = workdir / 'cover.webp'
+            if thumb is not None and make_cover(cfg['ffmpeg'], thumb, cover):
+                api.upload(song['thumbKey'], cover, 'image/webp')
+                log.info('[%d/%d] %s', n, len(songs), song['title'])
+            else:
+                log.warning('[%d/%d] no cover for %s', n, len(songs), song['title'])
+        except Exception as e:  # one bad video must not stop the rest
+            log.warning('[%d/%d] %s failed: %s', n, len(songs), song['title'], e)
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+    log.info('covers done')
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description='Soundly laptop agent')
     parser.add_argument('--config', default=str(HERE / 'config.json'))
     parser.add_argument('--once', action='store_true', help='process at most one job, then exit')
+    parser.add_argument('--refresh-covers', action='store_true', help='re-fetch all library covers in square high quality, then exit')
     args = parser.parse_args()
 
     cfg = load_config(Path(args.config))
     handlers: list[logging.Handler] = [logging.StreamHandler(), RotatingFileHandler(HERE / 'agent.log', maxBytes=1_000_000, backupCount=2, encoding='utf-8')]
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s', handlers=handlers)
+    if args.refresh_covers:
+        refresh_covers(cfg)
+        return
     run(cfg, args.once)
 
 

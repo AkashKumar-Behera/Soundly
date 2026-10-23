@@ -395,7 +395,7 @@
 .song-head,
 .song-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 6fr) minmax(0, 4fr) 76px 56px;
+  grid-template-columns: 44px minmax(0, 6fr) minmax(0, 4fr) 118px 56px;
   align-items: center;
   gap: 12px;
   padding: 0 12px;
@@ -484,9 +484,11 @@
 @media (max-width: 860px) {
   .song-head,
   .song-row {
-    grid-template-columns: 32px minmax(0, 1fr) 76px 48px;
+    grid-template-columns: 32px minmax(0, 1fr) 84px;
   }
-  .song-album {
+  .song-album,
+  .song-dur,
+  .song-row .like.dl {
     display: none;
   }
   .song-row .like {

@@ -3,12 +3,15 @@ import { persist } from 'zustand/middleware'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type UiStyle = 'classic' | 'blend'
-export type PlayerStyle = 'classic' | 'immersive' | 'vinyl'
+export type PlayerStyle = 'classic' | 'immersive' | 'vinyl' | 'modern'
 
 interface AppState {
   theme: ThemeMode
   ui: UiStyle
   playerStyle: PlayerStyle
+  /** Keep playing similar songs when the queue runs low. */
+  autoplay: boolean
+  setAutoplay: (on: boolean) => void
   setTheme: (t: ThemeMode) => void
   setUi: (u: UiStyle) => void
   setPlayerStyle: (p: PlayerStyle) => void
@@ -21,6 +24,8 @@ export const useApp = create<AppState>()(
       theme: 'dark',
       ui: 'classic',
       playerStyle: 'immersive',
+      autoplay: true,
+      setAutoplay: (autoplay) => set({ autoplay }),
       setTheme: (theme) => set({ theme }),
       setUi: (ui) => set({ ui }),
       setPlayerStyle: (playerStyle) => set({ playerStyle }),

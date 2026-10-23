@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { requireUser } from '../auth'
 import { createJob } from '../lib/jobs'
 import { wakeAgent } from '../lib/wake'
+import { ytmSearch, ytmSuggest } from '../lib/ytm'
 import type { AppEnv } from '../types'
 import { audit, getSetting } from '../util'
 
@@ -117,7 +118,8 @@ async function fetchPlaylist(key: string, listId: string, max: number): Promise<
 }
 
 async function cached<T>(db: D1Database, cacheKey: string, load: () => Promise<T>): Promise<T> {
-  const hit = await db.prepare("SELECT results FROM yt_cache WHERE q = ? AND created_at > datetime('now', '-1 day')").bind(cacheKey).first<{ results: string }>()
+  const ttl = cacheKey.startsWith('ytm:') ? '-6 hours' : '-1 day'
+  const hit = await db.prepare(`SELECT results FROM yt_cache WHERE q = ? AND created_at > datetime('now', '${ttl}')`).bind(cacheKey).first<{ results: string }>()
   if (hit) return JSON.parse(hit.results) as T
   const fresh = await load()
   await db
@@ -128,7 +130,7 @@ async function cached<T>(db: D1Database, cacheKey: string, load: () => Promise<T
 }
 
 /** Marks results that are already in the library or already requested, so the UI never offers a pointless download. */
-async function annotate(db: D1Database, results: Result[]) {
+export async function annotate(db: D1Database, results: Result[]) {
   const ids = results.map((r) => r.youtubeId)
   if (!ids.length) return []
   const marks = ids.map(() => '?').join(',')
@@ -155,13 +157,21 @@ function failure(c: { json: (b: unknown, s: 429 | 502 | 404) => Response }, e: u
 youtube.get('/search', async (c) => {
   const user = c.get('user')
   if (user.role === 'listener') return c.json({ error: 'forbidden' }, 403)
-  if (!c.env.YOUTUBE_API_KEY) return c.json({ error: 'youtube_not_configured' }, 503)
 
   const q = (c.req.query('q') ?? '').trim().slice(0, 100)
   if (q.length < 2) return c.json({ error: 'query_too_short' }, 400)
   const cacheKey = q.toLowerCase()
   const db = c.env.DB
 
+  // Primary: YouTube Music's own API (no key, no quota). Fallback: the official Data API, which has a small daily budget.
+  try {
+    const results = await cached(db, `ytm:${cacheKey}`, () => ytmSearch(q))
+    if (results.length) return c.json({ query: q, results: await annotate(db, results) })
+  } catch (e) {
+    console.error('ytm search failed', e)
+  }
+
+  if (!c.env.YOUTUBE_API_KEY) return c.json({ query: q, results: [] })
   const hit = await db.prepare("SELECT 1 AS ok FROM yt_cache WHERE q = ? AND created_at > datetime('now', '-1 day')").bind(cacheKey).first()
   if (!hit) {
     const [mine, all] = await Promise.all([
@@ -178,6 +188,18 @@ youtube.get('/search', async (c) => {
     return c.json({ query: q, results: await annotate(db, results) })
   } catch (e) {
     return failure(c, e)
+  }
+})
+
+// Type-ahead: finishes half-typed names, so people do not need the full title.
+youtube.get('/suggest', async (c) => {
+  const q = (c.req.query('q') ?? '').trim().slice(0, 80)
+  if (q.length < 2) return c.json({ suggestions: [] })
+  try {
+    return c.json({ suggestions: await ytmSuggest(q) })
+  } catch (e) {
+    console.error('ytm suggest failed', e)
+    return c.json({ suggestions: [] })
   }
 })
 

@@ -1,9 +1,10 @@
-import { ArrowDownToLine, Check, Heart, Pause, Play } from 'lucide-react'
+import { ArrowDownToLine, Check, Heart, MoreHorizontal, Pause, Play } from 'lucide-react'
 import type { Song } from '../data/mock'
 import { formatTime } from '../lib/format'
 import { useLibrary } from '../store/library'
 import { useOffline } from '../store/offline'
 import { useCurrent, usePlayer } from '../store/player'
+import { useUi } from '../store/ui'
 import { useOfflineSave } from '../lib/useOfflineSave'
 import { Cover } from './Cover'
 
@@ -11,9 +12,12 @@ interface Props {
   song: Song
   index: number
   onPlay: () => void
+  /** Set on a playlist page so the menu can offer to remove the song from it. */
+  playlistId?: string
 }
 
-export function SongRow({ song, index, onPlay }: Props) {
+export function SongRow({ song, index, onPlay, playlistId }: Props) {
+  const openMenu = useUi((s) => s.openSongMenu)
   const current = useCurrent()
   const playing = usePlayer((s) => s.playing)
   const liked = useLibrary((s) => s.liked.includes(song.id))
@@ -25,7 +29,14 @@ export function SongRow({ song, index, onPlay }: Props) {
   const toggleOffline = useOfflineSave()
 
   return (
-    <div className={`song-row ${active ? 'active' : ''}`} onDoubleClick={onPlay}>
+    <div
+      className={`song-row ${active ? 'active' : ''}`}
+      onDoubleClick={onPlay}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        openMenu({ song, x: e.clientX, y: e.clientY, playlistId })
+      }}
+    >
       <button
         className="song-idx"
         aria-label={active && playing ? `Pause ${song.title}` : `Play ${song.title}`}
@@ -58,6 +69,16 @@ export function SongRow({ song, index, onPlay }: Props) {
           onClick={() => toggleLike(song.id)}
         >
           <Heart size={18} fill={liked ? 'currentColor' : 'none'} />
+        </button>
+        <button
+          className="like more"
+          aria-label={`More options for ${song.title}`}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            openMenu({ song, x: r.right - 240, y: r.bottom + 4, playlistId })
+          }}
+        >
+          <MoreHorizontal size={20} />
         </button>
       </div>
       <div className="song-dur">{formatTime(song.duration)}</div>

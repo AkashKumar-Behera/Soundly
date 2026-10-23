@@ -34,6 +34,12 @@ agent.post('/heartbeat', async (c) => {
 })
 
 /** Atomically hand the oldest queued job to the agent. Claims stuck for 30 minutes are released first. */
+// Every song with a cover, so the agent can re-fetch covers in better quality (`agent.py --refresh-covers`).
+agent.get('/songs', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT title, youtube_id AS youtubeId, thumb_key AS thumbKey FROM songs WHERE youtube_id IS NOT NULL AND thumb_key IS NOT NULL').all()
+  return c.json({ songs: results })
+})
+
 agent.post('/claim', async (c) => {
   await c.env.DB.prepare(
     "UPDATE download_jobs SET status = 'queued', updated_at = datetime('now') WHERE status IN ('downloading', 'uploading') AND claimed_at < datetime('now', '-30 minutes')",

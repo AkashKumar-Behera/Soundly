@@ -6,13 +6,13 @@ import { clampInt, likePattern, parseRange } from '../util'
 export const songs = new Hono<AppEnv>()
 songs.use('*', requireUser)
 
-const SONG_SELECT = `
+export const SONG_SELECT = `
   SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration,
          s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId,
          EXISTS (SELECT 1 FROM likes l WHERE l.user_id = ?1 AND l.song_id = s.id) AS liked
   FROM songs s LEFT JOIN artists a ON a.id = s.artist_id`
 
-interface SongRow {
+export interface SongRow {
   id: string
   title: string
   artist: string | null

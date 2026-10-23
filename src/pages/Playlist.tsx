@@ -1,6 +1,6 @@
 import { ArrowDownToLine, Check, Heart, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Cover } from '../components/Cover'
 import { SongRow } from '../components/SongRow'
@@ -20,6 +20,9 @@ export function Playlist() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const getPlaylist = useLibrary((s) => s.getPlaylist)
   const likedIds = useLibrary((s) => s.liked)
+  const playlistsState = useLibrary((s) => s.playlists)
+  const renamePlaylist = useLibrary((s) => s.renamePlaylist)
+  const [renaming, setRenaming] = useState<string | null>(null)
   const playing = usePlayer((s) => s.playing)
   const sourceId = usePlayer((s) => s.sourceId)
   const playQueue = usePlayer((s) => s.playQueue)
@@ -40,7 +43,7 @@ export function Playlist() {
     return () => {
       live = false
     }
-  }, [id, getPlaylist, isLiked ? likedIds : null])
+  }, [id, getPlaylist, isLiked ? likedIds : playlistsState])
 
   if (data === undefined) return <p className="muted empty">Loading…</p>
   if (data === null) return <p className="muted empty">Playlist not found.</p>
@@ -77,7 +80,24 @@ export function Playlist() {
         )}
         <div className="pl-info">
           <span className="eyebrow">Playlist</span>
-          <h1>{pl.title}</h1>
+          {renaming !== null ? (
+            <form
+              className="rename"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const title = renaming.trim()
+                if (!title) return setRenaming(null)
+                void renamePlaylist(id, title).then((ok) => {
+                  showToast(ok ? 'Renamed' : 'Could not rename')
+                  setRenaming(null)
+                })
+              }}
+            >
+              <input autoFocus value={renaming} maxLength={80} onChange={(e) => setRenaming(e.target.value)} onBlur={() => setRenaming(null)} />
+            </form>
+          ) : (
+            <h1>{pl.title}</h1>
+          )}
           <p className="muted">{pl.description}</p>
           {!!pl.pendingCount && (
             <p className="muted">
@@ -110,6 +130,11 @@ export function Playlist() {
           {progress ? `Saving ${progress}` : allSaved ? 'Saved on this device' : 'Save for offline'}
         </button>
         {pl.isOwner && !isLiked && (
+          <button className="icon-btn" aria-label="Rename playlist" onClick={() => setRenaming(pl.title)}>
+            <Pencil size={20} />
+          </button>
+        )}
+        {pl.isOwner && !isLiked && (
           <button className="icon-btn bad" aria-label="Delete playlist" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={20} />
           </button>
@@ -139,7 +164,7 @@ export function Playlist() {
           <span>Time</span>
         </div>
         {list.map((s, i) => (
-          <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(list, i, id)} />
+          <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(list, i, id)} playlistId={id} />
         ))}
         {!list.length && <p className="muted empty">Nothing here yet.</p>}
       </div>

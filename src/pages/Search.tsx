@@ -1,4 +1,4 @@
-import { CirclePlay } from 'lucide-react'
+import { CirclePlay, Clock, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ImportPanel } from '../components/ImportPanel'
@@ -6,6 +6,8 @@ import { YoutubeRow } from '../components/YoutubeRow'
 import { SongRow } from '../components/SongRow'
 import { categories } from '../data/mock'
 import type { Song } from '../data/mock'
+import { addHistory, clearHistory, removeHistory } from '../lib/searchHistory'
+import { useHistory } from '../lib/useHistory'
 import { parseYoutubeLink } from '../lib/youtubeUrl'
 import { useCanRequestDirect, useLibrary, useRole } from '../store/library'
 import type { YoutubeResult } from '../store/library'
@@ -42,6 +44,7 @@ export function Search() {
   const showToast = useUi((s) => s.showToast)
   const [results, setResults] = useState<Song[] | null>(null)
   const [yt, setYt] = useState<YtState | null>(null)
+  const history = useHistory()
 
   // Debounced library search; a stale response never overwrites a newer one.
   useEffect(() => {
@@ -58,8 +61,8 @@ export function Search() {
     }
   }, [q, searchSongs])
 
-  // YouTube results belong to one query; typing something else clears them.
-  const ytForQuery = yt && yt.q === q ? yt : null
+  // The previous results stay on screen (dimmed) while the next query loads, so typing does not flash.
+  const ytForQuery = yt
 
   const runYoutube = async () => {
     setYt({ q, phase: 'loading', results: [] })
@@ -68,6 +71,25 @@ export function Search() {
   }
 
   const link = parseYoutubeLink(q)
+
+  // YouTube results load by themselves as you type (after a short pause), no button needed.
+  useEffect(() => {
+    if (q.length < 2 || link || role === 'listener') return
+    let live = true
+    setYt((cur) => ({ q, phase: 'loading', results: cur?.results ?? [] }))
+    const t = setTimeout(() => {
+      void searchYoutube(q).then((r) => {
+        if (!live) return
+        setYt(r.ok ? { q, phase: 'done', results: r.results } : { q, phase: 'error', results: [], error: r.error })
+        if (r.ok && r.results.length) addHistory(q)
+      })
+    }, 450)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, role])
 
   // A pasted video link skips the search and shows that exact video.
   useEffect(() => {
@@ -94,6 +116,28 @@ export function Search() {
   if (!q) {
     return (
       <>
+        {history.length > 0 && (
+          <>
+            <div className="history-head">
+              <h2 className="section-title">Recent searches</h2>
+              <button className="link-btn" onClick={clearHistory}>
+                Clear all
+              </button>
+            </div>
+            <div className="history-list">
+              {history.map((h) => (
+                <div key={h} className="history-item">
+                  <button onClick={() => setParams({ q: h })}>
+                    <Clock size={16} /> <span className="truncate">{h}</span>
+                  </button>
+                  <button className="x" aria-label={`Remove ${h}`} onClick={() => removeHistory(h)}>
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <h2 className="section-title">Browse all</h2>
         <div className="cats">
           {categories.map((c) => (
@@ -124,16 +168,11 @@ export function Search() {
       )}
 
       <h2 className="section-title yt-title">
-        <CirclePlay size={22} /> Not here? Search on YouTube
+        <CirclePlay size={22} /> More from YouTube
       </h2>
 
-      {!ytForQuery && link?.kind !== 'video' && (
-        <button className="btn-pill yt-go" disabled={role === 'listener'} onClick={() => void runYoutube()}>
-          Search YouTube for “{q}”
-        </button>
-      )}
       {role === 'listener' && <p className="muted empty">Listeners can’t request songs.</p>}
-      {ytForQuery?.phase === 'loading' && <p className="muted empty">Searching YouTube…</p>}
+      {ytForQuery?.phase === 'loading' && !ytForQuery.results.length && <p className="muted empty">Searching YouTube…</p>}
       {ytForQuery?.phase === 'error' && (
         <p className="muted empty">
           {messages[ytForQuery.error ?? ''] ?? 'YouTube search failed.'}{' '}
@@ -144,7 +183,7 @@ export function Search() {
       )}
       {ytForQuery?.phase === 'done' && !ytForQuery.results.length && <p className="muted empty">YouTube found nothing for “{q}”.</p>}
 
-      <div className="yt-list">
+      <div className={`yt-list ${ytForQuery?.phase === 'loading' ? 'dim' : ''}`}>
         {ytForQuery?.results.map((v) => (
           <YoutubeRow key={v.youtubeId} video={v} direct={direct} onRequest={(x) => void request(x)} />
         ))}
