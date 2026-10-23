@@ -23,6 +23,18 @@ A private, invite-only music streaming web app (PWA), inspired by the layout of 
 - Google sign-in, invite-only signup, sessions and roles (the login screen and admin invite manager)
 - Connected to the API: songs, streaming, playlists, likes, play history, requests and admin approvals. If the API is not reachable the app falls back to bundled demo data
 
+## Install, offline and lock screen
+
+- **Installable PWA.** Chrome and Edge offer "Install app" (also in Settings), iPhone uses Share > Add to Home Screen.
+  Icons are rendered by `python scripts/make-icons.py`.
+- **Offline.** A service worker (`src/sw.ts`) caches the app shell, so Soundly opens without a connection, and keeps the
+  last library snapshot (songs, playlists, likes) and covers. Admin, auth and search calls are never cached.
+- **Save for offline** (arrow on a song, or "Save for offline" on a playlist; Pro, trusted and admin). Songs are stored in
+  the browser's Cache Storage and played from there, with seeking, even with no network. Sign out wipes them.
+- **Lock screen and media keys.** Title, artist, album and cover art, play/pause, previous/next, seek and a scrubber.
+- **Shortcuts.** Space play/pause, left/right seek 5 s, Shift+left/right previous/next, M mute.
+- **Updates.** A new version waits behind a "Reload" banner so it never interrupts the music.
+
 ## Run
 
 ```bash
@@ -40,4 +52,5 @@ The Vite dev server proxies `/api` to the Worker on port 8787. Without the API t
 3. Login (Google), invites, roles (done; add your Google client ID to switch it on)
 4. Download queue and laptop agent (done: see [agent/README.md](agent/README.md); real YouTube search via the YouTube Data API)
 5. Admin panel and analytics (done: `/admin` with overview and charts, request queue, songs, users, invites, settings, activity log)
-6. Social features, PWA polish, deploy
+6. PWA, offline and polish (done: see below)
+7. Social features (listen together, Wrapped), playlist import

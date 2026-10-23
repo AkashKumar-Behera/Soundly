@@ -1,6 +1,9 @@
 import { motion } from 'motion/react'
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { useCurrent, usePlayer } from '../store/player'
+import { useShortcuts } from '../lib/useShortcuts'
+import { Banners } from './Banners'
 import { MobileNav } from './MobileNav'
 import { NowPlaying } from './NowPlaying'
 import { PlayerBar } from './PlayerBar'
@@ -11,6 +14,14 @@ import { TopBar } from './TopBar'
 export function Layout() {
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
+  const song = useCurrent()
+  const playing = usePlayer((s) => s.playing)
+  useShortcuts()
+
+  // The browser tab (and the taskbar) show what is playing.
+  useEffect(() => {
+    document.title = song && playing ? `${song.title} · ${song.artist} - Soundly` : 'Soundly'
+  }, [song, playing])
 
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 })
@@ -18,6 +29,7 @@ export function Layout() {
 
   return (
     <div className="app">
+      <Banners />
       <Sidebar />
       <main className="main" ref={mainRef}>
         <TopBar />

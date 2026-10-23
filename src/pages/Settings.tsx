@@ -1,9 +1,13 @@
-import { LogOut, ShieldCheck } from 'lucide-react'
+import { Download, LogOut, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DEV_ADMIN, getDevUser, setDevUser } from '../api/client'
 import { Segmented } from '../components/Segmented'
 import { useApp } from '../store/app'
+import { usePwa } from '../pwa'
 import { useLibrary } from '../store/library'
+import { useOffline } from '../store/offline'
+import { formatBytes } from './admin/ui'
 import type { Role } from '../store/library'
 
 // Seeded users in the local API (see api/seed.sql). Only shown by the dev server.
@@ -23,6 +27,16 @@ export function Settings() {
   const setDemoRole = useLibrary((s) => s.setDemoRole)
   const load = useLibrary((s) => s.load)
   const logout = useLibrary((s) => s.logout)
+  const { canInstall, installed, isIos, install } = usePwa()
+  const saved = useOffline((s) => s.saved)
+  const clearOffline = useOffline((s) => s.clear)
+  const [quota, setQuota] = useState<{ usage: number; quota: number } | null>(null)
+  const savedCount = Object.keys(saved).length
+  const savedBytes = Object.values(saved).reduce((a, b) => a + b, 0)
+
+  useEffect(() => {
+    void navigator.storage?.estimate?.().then((e) => setQuota({ usage: e.usage ?? 0, quota: e.quota ?? 0 }))
+  }, [saved])
 
   return (
     <>
@@ -42,6 +56,41 @@ export function Settings() {
           </button>
         </section>
       )}
+
+      <section className="setting">
+        <div>
+          <h3>Install Soundly</h3>
+          <p className="muted">
+            {installed
+              ? 'Installed. Soundly opens like an app and keeps your saved songs.'
+              : canInstall
+                ? 'Add Soundly to your home screen or desktop. It opens in its own window and works offline.'
+                : isIos
+                  ? 'On iPhone: tap the Share button, then “Add to Home Screen”.'
+                  : 'Use your browser’s menu and choose “Install Soundly” (or “Add to Home screen”).'}
+          </p>
+        </div>
+        {!installed && canInstall && (
+          <button className="btn-pill primary" onClick={() => void install()}>
+            <Download size={16} /> Install app
+          </button>
+        )}
+      </section>
+
+      <section className="setting">
+        <div>
+          <h3>Saved for offline</h3>
+          <p className="muted">
+            {savedCount ? `${savedCount} song${savedCount === 1 ? '' : 's'} on this device, ${formatBytes(savedBytes)}` : 'No songs saved yet. Tap the arrow on a song or use “Save for offline” on a playlist.'}
+            {quota?.quota ? ` · device storage used by Soundly: ${formatBytes(quota.usage)} of ${formatBytes(quota.quota)} available` : ''}
+          </p>
+        </div>
+        {savedCount > 0 && (
+          <button className="btn-pill" onClick={() => void clearOffline()}>
+            Remove all
+          </button>
+        )}
+      </section>
 
       <section className="setting">
         <div>

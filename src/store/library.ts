@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api, ApiError, setDemo, streamUrl, thumbUrl } from '../api/client'
+import { clearDeviceData } from '../lib/deviceCache'
 import { playlists as mockPlaylists, songById as mockSongById, songs as mockSongs } from '../data/mock'
 import type { Song } from '../data/mock'
 
@@ -121,7 +122,7 @@ export function toSong(s: ApiSong): Song {
 
 interface LibraryState {
   /** `unauth`: the API is reachable but nobody is signed in. */
-  status: 'loading' | 'ready' | 'unauth'
+  status: 'loading' | 'ready' | 'unauth' | 'offline'
   mode: 'api' | 'demo'
   me: Me | null
   songs: Song[]
@@ -176,6 +177,11 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       })
       void get().loadRequests()
     } catch (e) {
+      // fetch itself failed (TypeError) and no cached copy exists: the device is offline, not "no API".
+      if (e instanceof TypeError) {
+        set({ status: 'offline' })
+        return
+      }
       if (e instanceof ApiError && e.status === 401) {
         setDemo(false)
         set({ status: 'unauth', mode: 'api', me: null, songs: [], playlists: [], liked: [], recent: [], requests: [] })
@@ -199,7 +205,9 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 
   logout: async () => {
     if (get().mode === 'api') await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {})
-    // A full reload drops the audio element, queue and every cached library list with it.
+    // Wipe what this device kept for the account (library snapshot, covers, saved songs), then reload so the
+    // audio element, queue and every in-memory list go with it.
+    await clearDeviceData()
     window.location.assign('/login')
   },
 

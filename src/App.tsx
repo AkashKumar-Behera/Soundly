@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { Splash } from './components/Splash'
 import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
@@ -11,6 +12,7 @@ import { Search } from './pages/Search'
 import { Settings } from './pages/Settings'
 import { useApp } from './store/app'
 import { useLibrary } from './store/library'
+import { useOffline } from './store/offline'
 
 function useTheme() {
   const theme = useApp((s) => s.theme)
@@ -40,8 +42,10 @@ export default function App() {
   const status = useLibrary((s) => s.status)
   useEffect(() => {
     void load()
+    void useOffline.getState().init()
   }, [load])
-  if (status === 'loading') return <div className="boot" aria-busy="true" />
+  if (status === 'loading') return <Splash />
+  if (status === 'offline') return <Splash offline onRetry={() => void load()} />
   if (status === 'unauth') {
     return (
       <BrowserRouter>
@@ -64,6 +68,7 @@ export default function App() {
           <Route path="requests" element={<Requests />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

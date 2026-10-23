@@ -392,3 +392,8 @@
   padding: 0;
   text-decoration: underline;
 }
+
+.boot {
+  display: grid;
+  place-items: center;
+}

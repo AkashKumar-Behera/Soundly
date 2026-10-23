@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { logPlay } from '../api/client'
 import type { Song } from '../data/mock'
+import { mediaArtwork } from '../lib/artwork'
+import { useUi } from './ui'
 
 export type Repeat = 'off' | 'all' | 'one'
 
@@ -55,6 +57,7 @@ function setMediaMetadata(song: Song) {
     title: song.title,
     artist: song.artist,
     album: song.album,
+    artwork: mediaArtwork(song),
   })
 }
 
@@ -151,11 +154,43 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 }))
 
-audio.addEventListener('timeupdate', () => usePlayer.setState({ time: audio.currentTime }))
+let lastPosition = 0
+audio.addEventListener('timeupdate', () => {
+  usePlayer.setState({ time: audio.currentTime })
+  const now = Date.now()
+  if (now - lastPosition > 1000 && 'mediaSession' in navigator && Number.isFinite(audio.duration) && audio.duration > 0) {
+    lastPosition = now
+    try {
+      navigator.mediaSession.setPositionState({ duration: audio.duration, position: Math.min(audio.currentTime, audio.duration), playbackRate: audio.playbackRate })
+    } catch {
+      // some browsers reject odd values mid-seek; the next tick fixes it
+    }
+  }
+})
 audio.addEventListener('loadedmetadata', () => usePlayer.setState({ duration: audio.duration }))
 audio.addEventListener('durationchange', () => usePlayer.setState({ duration: audio.duration || 0 }))
-audio.addEventListener('play', () => usePlayer.setState({ playing: true }))
-audio.addEventListener('pause', () => usePlayer.setState({ playing: false }))
+// Consecutive playback failures, so one missing file skips ahead but a dead network does not loop forever.
+let failures = 0
+audio.addEventListener('playing', () => {
+  failures = 0
+})
+audio.addEventListener('play', () => {
+  usePlayer.setState({ playing: true })
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
+})
+audio.addEventListener('pause', () => {
+  usePlayer.setState({ playing: false })
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'
+})
+audio.addEventListener('error', () => {
+  const { queue, index } = usePlayer.getState()
+  const song = queue[index]
+  if (!song) return
+  failures++
+  useUi.getState().showToast(`Couldn't play “${song.title}”${navigator.onLine ? '' : ' (offline, not saved on this device)'}`)
+  if (failures < 3 && index < queue.length - 1) setTimeout(() => usePlayer.getState().next(true), 600)
+  else usePlayer.setState({ playing: false })
+})
 audio.addEventListener('ended', () => {
   if (playing) logPlay(playing.id, Math.floor(audio.duration || 0))
   playing = null
@@ -171,6 +206,8 @@ if ('mediaSession' in navigator) {
   ms.setActionHandler('seekto', (d) => {
     if (d.seekTime != null) usePlayer.getState().seek(d.seekTime)
   })
+  ms.setActionHandler('seekbackward', (d) => usePlayer.getState().seek(Math.max(0, audio.currentTime - (d.seekOffset ?? 10))))
+  ms.setActionHandler('seekforward', (d) => usePlayer.getState().seek(Math.min(audio.duration || Infinity, audio.currentTime + (d.seekOffset ?? 10))))
 }
 
 export const useCurrent = (): Song | undefined => usePlayer((s) => s.queue[s.index] as Song | undefined)

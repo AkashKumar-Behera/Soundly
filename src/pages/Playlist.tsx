@@ -1,4 +1,4 @@
-import { Heart, Pause, Play, Shuffle } from 'lucide-react'
+import { ArrowDownToLine, Check, Heart, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Cover } from '../components/Cover'
@@ -6,7 +6,10 @@ import { SongRow } from '../components/SongRow'
 import type { Song } from '../data/mock'
 import { useLibrary } from '../store/library'
 import type { Playlist as PlaylistInfo } from '../store/library'
+import { useCanSaveOffline } from '../lib/useOfflineSave'
+import { useOffline } from '../store/offline'
 import { usePlayer } from '../store/player'
+import { useUi } from '../store/ui'
 
 export function Playlist() {
   const { id = '' } = useParams()
@@ -19,6 +22,10 @@ export function Playlist() {
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
 
   const [data, setData] = useState<{ playlist: PlaylistInfo; songs: Song[] } | null | undefined>(undefined)
+  const [progress, setProgress] = useState<string | null>(null)
+  const saved = useOffline((s) => s.saved)
+  const canSave = useCanSaveOffline()
+  const showToast = useUi((s) => s.showToast)
   const isLiked = id === 'liked'
 
   // Reload when the id changes, and for "liked" whenever a heart is toggled.
@@ -37,6 +44,21 @@ export function Playlist() {
   const total = list.reduce((n, s) => n + s.duration, 0)
   const here = sourceId === id
   const play = () => (here ? toggle() : playQueue(list, 0, id))
+  const allSaved = list.length > 0 && list.every((s) => saved[s.id] !== undefined)
+
+  const saveAll = async () => {
+    const { remove, saveMany } = useOffline.getState()
+    if (allSaved) {
+      await Promise.all(list.map((s) => remove(s.id)))
+      return showToast('Removed from this device')
+    }
+    if (!canSave) return showToast('Saving songs for offline is a Pro perk')
+    if (!navigator.onLine) return showToast('Connect to the internet to save songs')
+    const todo = list.filter((s) => saved[s.id] === undefined)
+    const ok = await saveMany(todo, (done, total) => setProgress(`${done}/${total}`))
+    setProgress(null)
+    showToast(ok === todo.length ? `Saved ${ok} song${ok === 1 ? '' : 's'} for offline` : `Saved ${ok} of ${todo.length}, some failed`)
+  }
 
   return (
     <>
@@ -72,6 +94,10 @@ export function Playlist() {
           }}
         >
           <Shuffle size={28} />
+        </button>
+        <button className="btn-pill" disabled={!list.length || progress !== null} onClick={() => void saveAll()}>
+          {allSaved ? <Check size={16} /> : <ArrowDownToLine size={16} />}
+          {progress ? `Saving ${progress}` : allSaved ? 'Saved on this device' : 'Save for offline'}
         </button>
       </div>
 
