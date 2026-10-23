@@ -317,6 +317,9 @@
 .card {
   position: relative;
   flex: 0 0 184px;
+  /* Without this a flex item grows to fit its longest nowrap title, so cards end up with different widths. */
+  min-width: 0;
+  width: 184px;
   padding: 12px;
   border-radius: var(--radius);
   scroll-snap-align: start;
@@ -381,6 +384,7 @@
   margin: 0 -8px;
 }
 .grid .card {
+  width: auto;
   flex: none;
 }
 
@@ -490,6 +494,7 @@
   }
   .card {
     flex-basis: 150px;
+    width: 150px;
   }
 }
 
