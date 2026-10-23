@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { requireAgent } from '../auth'
+import { wakeAgent } from '../lib/wake'
 import type { Env } from '../types'
 
 /**
@@ -8,6 +9,12 @@ import type { Env } from '../types'
  */
 export const agent = new Hono<{ Bindings: Env }>()
 agent.use('*', requireAgent)
+
+/** The agent's outbound WebSocket. Frames from the Worker: {type:'wake'} (a job is claimable), {type:'ack'}. */
+agent.get('/ws', async (c): Promise<Response> => {
+  if (c.req.header('Upgrade') !== 'websocket') return c.json({ error: 'expected_websocket' }, 426)
+  return c.env.AGENT_HUB.get(c.env.AGENT_HUB.idFromName('main')).fetch(c.req.raw)
+})
 
 const KEY = /^(songs|thumbs)\/[A-Za-z0-9._-]{1,120}$/
 
@@ -128,5 +135,6 @@ agent.post('/jobs/:id/fail', async (c) => {
   )
     .bind((body.error ?? 'unknown error').slice(0, 300), body.fatal ? 1 : 0, c.req.param('id'))
     .run()
+  wakeAgent(c.env, c.executionCtx) // a requeued job is claimable again
   return c.json({ ok: true })
 })

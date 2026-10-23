@@ -5,9 +5,11 @@ interface UiState {
   toast: string | null
   /** Set when a new app version is ready; calling it installs the update and reloads. */
   applyUpdate: (() => void) | null
+  roomModal: boolean
   setNowPlaying: (open: boolean) => void
   showToast: (message: string) => void
   setUpdate: (apply: (() => void) | null) => void
+  setRoomModal: (open: boolean) => void
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -16,6 +18,7 @@ export const useUi = create<UiState>((set) => ({
   nowPlaying: false,
   toast: null,
   applyUpdate: null,
+  roomModal: false,
   setNowPlaying: (nowPlaying) => set({ nowPlaying }),
   showToast: (toast) => {
     clearTimeout(toastTimer)
@@ -23,4 +26,5 @@ export const useUi = create<UiState>((set) => ({
     toastTimer = setTimeout(() => set({ toast: null }), 2600)
   },
   setUpdate: (apply) => set({ applyUpdate: apply }),
+  setRoomModal: (roomModal) => set({ roomModal }),
 }))

@@ -6,7 +6,7 @@ interface Stats {
   songs: { count: number; storageBytes: number; freeLimitBytes: number }
   jobs: Record<string, number>
   playsLast7Days: number
-  agent: { id: string; online: boolean; onHomeWifi: boolean; lastSeenAt: string; version: string | null; currentJobId: string | null } | null
+  agent: { id: string; online: boolean; push?: boolean; onHomeWifi: boolean; lastSeenAt: string; version: string | null; currentJobId: string | null } | null
 }
 
 interface Analytics {
@@ -46,7 +46,7 @@ export function Overview({ goTo }: { goTo: (tab: string) => void }) {
           label="Laptop agent"
           value={!agent ? 'Never seen' : agent.online ? (agent.onHomeWifi ? 'Online' : 'Paused') : 'Offline'}
           tone={!agent ? 'bad' : agent.online && agent.onHomeWifi ? 'ok' : 'warn'}
-          sub={agent ? `${agent.online ? (agent.onHomeWifi ? 'working' : 'not on home wifi') : 'last seen ' + timeAgo(agent.lastSeenAt)}${agent.version ? ' · v' + agent.version : ''}` : 'start agent.py on the laptop'}
+          sub={agent ? `${agent.online ? (agent.onHomeWifi ? 'working' : 'not on home wifi') : 'last seen ' + timeAgo(agent.lastSeenAt)}${agent.push ? ' · live connection' : ''}${agent.version ? ' · v' + agent.version : ''}` : 'start agent.py on the laptop'}
         />
       </div>
 

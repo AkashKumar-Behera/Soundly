@@ -1,12 +1,18 @@
 # Soundly laptop agent
 
-Runs on your own computer and does the heavy lifting for song requests. It polls the Soundly API (outbound only, so
-nothing on your laptop is exposed) and processes one request at a time:
+Runs on your own computer and does the heavy lifting for song requests. It keeps **one outbound WebSocket** open to the
+Soundly Worker (a Durable Object), so nothing on your laptop is exposed and there is no tunnel to run. The moment a
+request becomes claimable the Worker pushes a "wake" message, and the agent processes the queue:
 
 ```
-heartbeat -> claim the oldest queued request -> yt-dlp download -> mp3 (192 kbps) + cover (webp)
-          -> upload to Cloudflare R2 through the API -> song appears in everyone's library
+wake (push) -> claim the oldest queued request -> yt-dlp download -> mp3 (192 kbps) + cover (webp)
+            -> upload to Cloudflare R2 through the API -> song appears in everyone's library
 ```
+
+- **No polling** while the push connection is up, only a slow safety check every 5 minutes (`safety_poll_seconds`).
+  If the connection drops, the agent reconnects with backoff and polls every `poll_seconds` meanwhile, so it never
+  gets stuck. `"use_push": false` forces plain polling.
+- The agent reports its status (home Wi-Fi, current job) over the same connection, which is what the admin sees.
 
 - **Home Wi-Fi only.** It claims work only while the laptop is on a Wi-Fi network listed in `home_ssids`. Elsewhere it
   keeps sending heartbeats (so the admin sees "paused, not home") and leaves the queue alone.
@@ -33,6 +39,8 @@ copy config.example.json config.json     # then edit it
 | `allow_ethernet` | treat a wired connection as home |
 | `ffmpeg` | path to `ffmpeg` (needs libmp3lame and libwebp) |
 | `max_duration_sec` | skip anything longer (default 1200) |
+| `use_push` | use the WebSocket push channel (default true) |
+| `safety_poll_seconds` | slow safety check while push is up (default 300) |
 
 Check your current Wi-Fi name with `netsh wlan show interfaces`.
 

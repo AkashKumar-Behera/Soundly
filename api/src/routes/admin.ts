@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
 import type { AppEnv } from '../types'
+import { agentStatus, wakeAgent } from '../lib/wake'
 import { audit, getSetting } from '../util'
 import { shapeJob } from './requests'
 import type { JobRow } from './requests'
@@ -28,6 +29,7 @@ admin.post('/requests/:id/approve', async (c) => {
     .run()
   if (!res.meta.changes) return c.json({ error: 'not_pending' }, 409)
   await audit(c.env.DB, c.get('user').id, 'request.approve', id)
+  wakeAgent(c.env, c.executionCtx)
   return c.json({ status: 'queued' })
 })
 
@@ -55,13 +57,14 @@ admin.post('/requests/:id/retry', async (c) => {
     .run()
   if (!res.meta.changes) return c.json({ error: 'not_failed' }, 409)
   await audit(c.env.DB, c.get('user').id, 'request.retry', id)
+  wakeAgent(c.env, c.executionCtx)
   return c.json({ status: 'queued' })
 })
 
 // ---------- Dashboard numbers ----------
 admin.get('/stats', async (c) => {
   const db = c.env.DB
-  const [users, songs, jobs, plays, agent, maxUsers, window] = await Promise.all([
+  const [users, songs, jobs, plays, agent, maxUsers, window, hub] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS n FROM users WHERE disabled = 0').first<{ n: number }>(),
     db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM songs').first<{ n: number; bytes: number }>(),
     db.prepare('SELECT status, COUNT(*) AS n FROM download_jobs GROUP BY status').all<{ status: string; n: number }>(),
@@ -75,9 +78,12 @@ admin.get('/stats', async (c) => {
     }>(),
     getSetting(db, 'max_users', 30),
     getSetting(db, 'agent_online_window_sec', 90),
+    agentStatus(c.env),
   ])
 
-  const online = agent ? Date.now() - new Date(agent.last_seen_at.replace(' ', 'T') + 'Z').getTime() < window * 1000 : false
+  // A live push connection is the best signal; an older polling agent is recognised by its recent heartbeat.
+  const polled = agent ? Date.now() - new Date(agent.last_seen_at.replace(' ', 'T') + 'Z').getTime() < window * 1000 : false
+  const online = !!hub?.connected || polled
 
   return c.json({
     users: { count: users?.n ?? 0, max: maxUsers },
@@ -85,8 +91,10 @@ admin.get('/stats', async (c) => {
     jobs: Object.fromEntries(jobs.results.map((r) => [r.status, r.n])),
     playsLast7Days: plays?.n ?? 0,
     agent: agent
-      ? { id: agent.agent_id, online, onHomeWifi: !!agent.on_home_wifi, lastSeenAt: agent.last_seen_at, version: agent.version, currentJobId: agent.current_job_id }
-      : null,
+      ? { id: agent.agent_id, online, push: !!hub?.connected, onHomeWifi: hub?.connected ? hub.onHomeWifi : !!agent.on_home_wifi, lastSeenAt: hub?.connected && hub.lastSeen ? new Date(hub.lastSeen).toISOString().slice(0, 19).replace('T', ' ') : agent.last_seen_at, version: hub?.connected ? hub.version : agent.version, currentJobId: hub?.connected ? hub.currentJobId : agent.current_job_id }
+      : hub?.connected
+        ? { id: hub.agentId ?? 'laptop', online: true, push: true, onHomeWifi: hub.onHomeWifi, lastSeenAt: hub.lastSeen ? new Date(hub.lastSeen).toISOString().slice(0, 19).replace('T', ' ') : '', version: hub.version, currentJobId: hub.currentJobId }
+        : null,
   })
 })
 

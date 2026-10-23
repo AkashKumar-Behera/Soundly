@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireUser } from '../auth'
 import { createJob } from '../lib/jobs'
+import { wakeAgent } from '../lib/wake'
 import type { AppEnv } from '../types'
 import { audit, getSetting } from '../util'
 
@@ -291,6 +292,7 @@ youtube.post('/import', async (c) => {
   statements.push(db.prepare('INSERT INTO playlist_imports (id, user_id, playlist_id, list_id, title, songs) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), user.id, playlistId, listId, data.title, chosen.length))
   await db.batch(statements)
   await audit(db, user.id, 'playlist.import', playlistId, { title: data.title, songs: chosen.length, inLibrary, queued, pending })
+  if (queued) wakeAgent(c.env, c.executionCtx)
 
   return c.json({ playlistId, title, inLibrary, queued, pendingApproval: pending, alreadyRequested, skipped }, 201)
 })

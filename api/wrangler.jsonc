@@ -14,6 +14,14 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+  // Durable Objects: the agent push channel and the listening rooms (SQLite-backed, available on the free plan).
+  "durable_objects": {
+    "bindings": [
+      { "name": "AGENT_HUB", "class_name": "AgentHub" },
+      { "name": "ROOM", "class_name": "Room" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AgentHub", "Room"] }],
   "vars": {
     // DEV_AUTH enables X-Dev-User and /api/auth/dev-login for local work. The `deploy` script forces it to "false".
     "DEV_AUTH": "true",

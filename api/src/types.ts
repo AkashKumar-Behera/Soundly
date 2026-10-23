@@ -11,6 +11,10 @@ export interface Env {
   /** YouTube Data API v3 key, a Wrangler secret. Without it, YouTube search answers 503. */
   YOUTUBE_API_KEY: string
   AGENT_TOKEN: string
+  /** Push channel to the laptop agent (one instance, named "main"). */
+  AGENT_HUB: DurableObjectNamespace
+  /** Listening rooms, one instance per room code. */
+  ROOM: DurableObjectNamespace
 }
 
 export type Role = 'listener' | 'member' | 'trusted' | 'admin'

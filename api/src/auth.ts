@@ -26,7 +26,7 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
       if (!origin || !allowedOrigins(c.env).includes(origin)) return c.json({ error: 'bad_origin' }, 403)
     }
   } else if (c.env.DEV_AUTH === 'true') {
-    const email = c.req.header('X-Dev-User')
+    const email = c.req.header('X-Dev-User') ?? c.req.query('devUser')
     if (email) {
       user = await c.env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users u WHERE u.email = ?`).bind(email).first<User>()
     }

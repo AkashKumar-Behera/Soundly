@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Soundly laptop agent.
 
-Runs on your own computer and polls the Soundly API (outbound only, nothing here is exposed to the internet):
+Runs on your own computer and keeps ONE outbound WebSocket open to the Soundly Worker (nothing here is exposed to
+the internet). The moment a request becomes claimable the Worker pushes a "wake" message, and the agent does:
 
-    heartbeat -> claim the oldest queued request -> download with yt-dlp -> mp3 + cover -> upload to R2 -> complete
+    claim the oldest queued request -> download with yt-dlp -> mp3 + cover -> upload to R2 -> complete
+
+There is no polling while the push connection is up (only a slow safety check every few minutes). If the push
+channel is unavailable the agent falls back to polling every few seconds, so it never gets stuck.
 
 It only claims work while the laptop is on your home Wi-Fi. If the laptop was off, requests simply wait in the
-queue and the agent picks them up the next time it runs.
+queue and the agent drains them as soon as it starts.
 """
 
 from __future__ import annotations
@@ -18,13 +22,19 @@ import re
 import subprocess
 import tempfile
 import threading
+import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import requests
 import yt_dlp
 
-VERSION = '0.1.0'
+try:
+    import websocket  # websocket-client
+except ImportError:  # push is optional; polling still works
+    websocket = None
+
+VERSION = '0.2.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -49,7 +59,9 @@ class JobError(Exception):
 def load_config(path: Path) -> dict:
     cfg = json.loads(path.read_text(encoding='utf-8'))
     base = path.parent
-    cfg.setdefault('poll_seconds', 15)
+    cfg.setdefault('poll_seconds', 15)  # used only while the push connection is down
+    cfg.setdefault('safety_poll_seconds', 300)  # slow safety net while push is up
+    cfg.setdefault('use_push', True)
     cfg.setdefault('heartbeat_seconds', 30)
     cfg.setdefault('max_duration_sec', 1200)
     cfg.setdefault('home_ssids', [])
@@ -227,14 +239,87 @@ class State:
     def __init__(self) -> None:
         self.job_id: str | None = None
         self.on_home = False
+        self.push_connected = False
+
+
+def ws_url(cfg: dict) -> str:
+    base = cfg['api_url']
+    return ('wss://' if base.startswith('https://') else 'ws://') + base.split('://', 1)[1] + '/agent/ws'
+
+
+class Push(threading.Thread):
+    """Outbound WebSocket to the Worker. Sets `wake` whenever the server says a job is waiting."""
+
+    def __init__(self, cfg: dict, state: State, wake: threading.Event, stop: threading.Event):
+        super().__init__(daemon=True)
+        self.cfg, self.state, self.wake, self.stop = cfg, state, wake, stop
+        self.app = None
+
+    def status_message(self, kind: str) -> str:
+        return json.dumps({'type': kind, 'agentId': self.cfg['agent_id'], 'version': VERSION, 'onHomeWifi': self.state.on_home, 'jobId': self.state.job_id})
+
+    def run(self) -> None:
+        delay = 2
+        while not self.stop.is_set():
+            connected_at = 0.0
+
+            def on_open(app):
+                nonlocal connected_at
+                connected_at = time.time()
+                self.state.push_connected = True
+                app.send(self.status_message('hello'))
+                log.info('push channel connected')
+                threading.Thread(target=self._ticker, args=(app,), daemon=True).start()
+                self.wake.set()  # drain anything that queued while we were away
+
+            def on_message(_app, message):
+                try:
+                    if json.loads(message).get('type') == 'wake':
+                        self.wake.set()
+                except ValueError:
+                    pass
+
+            def on_error(_app, error):
+                log.warning('push channel error: %s', error)
+
+            self.app = websocket.WebSocketApp(
+                ws_url(self.cfg),
+                header=[f"Authorization: Bearer {self.cfg['token']}"],
+                on_open=on_open,
+                on_message=on_message,
+                on_error=on_error,
+            )
+            self.app.run_forever(ping_interval=20, ping_timeout=10)
+            self.state.push_connected = False
+            if self.stop.is_set():
+                break
+            # Stay connected for a while? then retry quickly; failing right away? back off.
+            delay = 2 if time.time() - connected_at > 60 else min(delay * 2, 60)
+            log.info('push channel closed, reconnecting in %ss (polling meanwhile)', delay)
+            self.stop.wait(delay)
+
+    def _ticker(self, app) -> None:
+        """Tells the server how we are doing (home wifi, current job). Also keeps NAT/proxies from dropping us."""
+        while not self.stop.is_set() and app is self.app and self.state.push_connected:
+            if self.stop.wait(25):
+                break
+            try:
+                app.send(self.status_message('status'))
+            except Exception:  # noqa: BLE001 - connection is gone; run() reconnects
+                break
+
+    def close(self) -> None:
+        if self.app is not None:
+            self.app.close()
 
 
 def heartbeat_loop(api: Api, cfg: dict, state: State, stop: threading.Event) -> None:
     while not stop.is_set():
-        try:
-            api.heartbeat(cfg['agent_id'], state.on_home, state.job_id)
-        except requests.RequestException as e:
-            log.warning('heartbeat failed: %s', e)
+        if not state.push_connected:  # while the push channel is up it reports our status itself
+            try:
+                api.heartbeat(cfg['agent_id'], state.on_home, state.job_id)
+            except requests.RequestException as e:
+                log.warning('heartbeat failed: %s', e)
         stop.wait(cfg['heartbeat_seconds'])
 
 
@@ -242,8 +327,21 @@ def run(cfg: dict, once: bool) -> None:
     api = Api(cfg)
     state = State()
     stop = threading.Event()
+    wake = threading.Event()
+    state.on_home = on_home_network(cfg)  # so the first status report is already correct
     threading.Thread(target=heartbeat_loop, args=(api, cfg, state, stop), daemon=True).start()
-    log.info('agent %s started, API %s, home networks: %s', VERSION, cfg['api_url'], cfg['home_ssids'] or 'any')
+    push: Push | None = None
+    if cfg['use_push'] and websocket is not None:
+        push = Push(cfg, state, wake, stop)
+        push.start()
+    elif cfg['use_push']:
+        log.warning('websocket-client is not installed (pip install websocket-client); polling instead')
+    log.info('agent %s started, API %s, home networks: %s, mode: %s', VERSION, cfg['api_url'], cfg['home_ssids'] or 'any', 'push' if push else 'polling')
+
+    def idle(seconds: float) -> None:
+        """Sleep until the server wakes us, or `seconds` pass (a safety net), whichever is first."""
+        wake.wait(seconds)
+        wake.clear()
 
     was_home: bool | None = None
     backoff = cfg['poll_seconds']
@@ -254,7 +352,7 @@ def run(cfg: dict, once: bool) -> None:
                 log.info('network: %s (%s)', 'home, working' if state.on_home else 'not home, paused', current_ssid() or 'no wifi')
                 was_home = state.on_home
             if not state.on_home:
-                stop.wait(cfg['poll_seconds'])
+                idle(cfg['poll_seconds'])  # re-check the network every few seconds, push or not
                 continue
 
             try:
@@ -270,7 +368,8 @@ def run(cfg: dict, once: bool) -> None:
                 if once:
                     log.info('queue is empty')
                     return
-                stop.wait(cfg['poll_seconds'])
+                # Queue drained: wait for a push (or the slow safety check; fast polling only without push).
+                idle(cfg['safety_poll_seconds'] if state.push_connected else cfg['poll_seconds'])
                 continue
 
             state.job_id = job['id']
@@ -296,6 +395,8 @@ def run(cfg: dict, once: bool) -> None:
         log.info('stopping')
     finally:
         stop.set()
+        if push is not None:
+            push.close()
 
 
 def _report_failure(api: Api, job_id: str, message: str, fatal: bool) -> None:

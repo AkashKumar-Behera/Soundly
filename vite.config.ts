@@ -40,6 +40,6 @@ export default defineConfig({
   ],
   server: {
     // Same-origin API in dev, so cookies work later and CORS never gets in the way.
-    proxy: { '/api': 'http://127.0.0.1:8787' },
+    proxy: { '/api': { target: 'http://127.0.0.1:8787', ws: true } },
   },
 })

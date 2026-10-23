@@ -8,6 +8,7 @@ import { Library } from './pages/Library'
 import { Login } from './pages/Login'
 import { Playlist } from './pages/Playlist'
 import { Requests } from './pages/Requests'
+import { RoomJoin } from './pages/RoomJoin'
 import { Search } from './pages/Search'
 import { Wrapped } from './pages/Wrapped'
 import { Settings } from './pages/Settings'
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />
           <Route path="wrapped" element={<Wrapped />} />
+          <Route path="room/:code" element={<RoomJoin />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

@@ -6,6 +6,26 @@ import { useUi } from './ui'
 
 export type Repeat = 'off' | 'all' | 'one'
 
+/** What the local user asked for while in a listening room: the room decides, then everyone (us included) applies it. */
+export type RoomAction =
+  | { kind: 'play'; songs: Song[]; index: number }
+  | { kind: 'jump'; index: number }
+  | { kind: 'toggle'; playing: boolean; position: number }
+  | { kind: 'seek'; position: number }
+  | { kind: 'next'; from: number }
+  | { kind: 'enqueue'; song: Song }
+
+export interface RoomHook {
+  active: () => boolean
+  send: (action: RoomAction) => void
+}
+
+let roomHook: RoomHook | null = null
+export function setRoomHook(hook: RoomHook | null) {
+  roomHook = hook
+}
+const inRoom = () => !!roomHook?.active()
+
 interface PlayerState {
   queue: Song[]
   index: number
@@ -28,6 +48,10 @@ interface PlayerState {
   cycleRepeat: () => void
   enqueue: (song: Song) => void
   playNext: (song: Song) => void
+  /** Apply the shared room state: load the right song, jump to the right moment, play or pause. */
+  applyRoom: (queue: Song[], index: number, playing: boolean, position: number, onBlocked: () => void) => void
+  /** Start audio after the browser blocked autoplay (needs a tap). */
+  resume: () => void
 }
 
 // One audio element for the whole app, kept outside React so re-renders never touch playback.
@@ -48,6 +72,13 @@ function load(song: Song) {
   audio.src = song.src
   audio.currentTime = 0
   void audio.play().catch(() => {})
+  setMediaMetadata(song)
+}
+
+function loadSilently(song: Song) {
+  flushPlay()
+  playing = song
+  audio.src = song.src
   setMediaMetadata(song)
 }
 
@@ -74,6 +105,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   playQueue: (songs, index, sourceId = null) => {
     if (!songs.length) return
+    if (inRoom()) return roomHook?.send({ kind: 'play', songs, index })
     set({ queue: songs, index, sourceId, time: 0 })
     load(songs[index])
   },
@@ -81,12 +113,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   playAt: (index) => {
     const { queue } = get()
     if (index < 0 || index >= queue.length) return
+    if (inRoom()) return roomHook?.send({ kind: 'jump', index })
     set({ index, time: 0 })
     load(queue[index])
   },
 
   toggle: () => {
     if (get().index < 0) return
+    if (inRoom()) return roomHook?.send({ kind: 'toggle', playing: audio.paused, position: audio.currentTime })
     if (audio.paused) void audio.play().catch(() => {})
     else audio.pause()
   },
@@ -94,6 +128,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   next: (auto = false) => {
     const { queue, index, shuffle, repeat } = get()
     if (!queue.length) return
+    // The room advances once even though every listener's song ends at the same moment.
+    if (inRoom()) return roomHook?.send({ kind: 'next', from: index })
     if (auto && repeat === 'one') {
       audio.currentTime = 0
       void audio.play().catch(() => {})
@@ -116,6 +152,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   prev: () => {
     const { index } = get()
     if (audio.currentTime > 3 || index <= 0) {
+      if (inRoom()) return roomHook?.send({ kind: 'seek', position: 0 })
       audio.currentTime = 0
       return
     }
@@ -123,6 +160,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   seek: (t) => {
+    if (inRoom() && Number.isFinite(t)) return roomHook?.send({ kind: 'seek', position: Math.max(0, t) })
     if (Number.isFinite(t)) audio.currentTime = t
   },
 
@@ -137,12 +175,14 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set((s) => ({ repeat: s.repeat === 'off' ? 'all' : s.repeat === 'all' ? 'one' : 'off' })),
 
   enqueue: (song) => {
+    if (inRoom()) return roomHook?.send({ kind: 'enqueue', song })
     const { queue } = get()
     if (!queue.length) get().playQueue([song], 0)
     else set({ queue: [...queue, song] })
   },
 
   playNext: (song) => {
+    if (inRoom()) return roomHook?.send({ kind: 'enqueue', song })
     const { queue, index } = get()
     if (!queue.length) {
       get().playQueue([song], 0)
@@ -151,6 +191,24 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     const copy = queue.slice()
     copy.splice(index + 1, 0, song)
     set({ queue: copy })
+  },
+
+  applyRoom: (queue, index, playing, position, onBlocked) => {
+    const song = queue[index]
+    set({ queue, index, sourceId: 'room' })
+    if (!song) {
+      audio.pause()
+      return
+    }
+    const sameSong = get().queue[index]?.id === song.id && audio.src.includes(`/stream/${song.id}`)
+    if (!sameSong) loadSilently(song)
+    if (Math.abs(audio.currentTime - position) > 0.6) audio.currentTime = position
+    if (playing) void audio.play().catch(onBlocked)
+    else audio.pause()
+  },
+
+  resume: () => {
+    void audio.play().catch(() => {})
   },
 }))
 

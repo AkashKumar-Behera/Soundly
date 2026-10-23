@@ -23,6 +23,16 @@ A private, invite-only music streaming web app (PWA), inspired by the layout of 
 - Google sign-in, invite-only signup, sessions and roles (the login screen and admin invite manager)
 - Connected to the API: songs, streaming, playlists, likes, play history, requests and admin approvals. If the API is not reachable the app falls back to bundled demo data
 
+## Listen together, Wrapped, playlist import
+
+- **Listen together.** Start a room (Users icon in the player bar), share the code or invite link, and everyone hears the
+  same music in sync. Anyone can play, pause, seek, skip or add songs. Built on a Durable Object WebSocket.
+- **Wrapped.** A story-style recap (minutes, top song and artists, your listening clock in your timezone, biggest day,
+  streaks, persona) for this year, the last 30 days or all time.
+- **Playlist import.** Paste a YouTube playlist (or a single video) link in the search box, pick songs, and import. Songs
+  already in the library join at once, the rest download and join the playlist when they arrive.
+- **Agent push.** The laptop agent holds one outbound WebSocket and is woken the instant a job is claimable (no polling).
+
 ## Install, offline and lock screen
 
 - **Installable PWA.** Chrome and Edge offer "Install app" (also in Settings), iPhone uses Share > Add to Home Screen.
@@ -53,4 +63,5 @@ The Vite dev server proxies `/api` to the Worker on port 8787. Without the API t
 4. Download queue and laptop agent (done: see [agent/README.md](agent/README.md); real YouTube search via the YouTube Data API)
 5. Admin panel and analytics (done: `/admin` with overview and charts, request queue, songs, users, invites, settings, activity log)
 6. PWA, offline and polish (done: see below)
-7. Social features (listen together, Wrapped), playlist import
+7. Playlist import, Wrapped, listen together, agent push (done: see below)
+8. Ideas: collaborative playlists, activity feed, synced lyrics

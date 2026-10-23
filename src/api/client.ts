@@ -64,8 +64,14 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   return data as T
 }
 
-export const streamUrl = (id: string) => `${API_BASE}/stream/${id}`
-export const thumbUrl = (id: string) => `${API_BASE}/thumb/${id}`
+// <audio> and <img> cannot send headers. In production the session cookie authenticates them; the dev server
+// (DEV_AUTH) takes the seeded user from the query string instead.
+const devQuery = () => {
+  const dev = getDevUser()
+  return dev ? `?devUser=${encodeURIComponent(dev)}` : ''
+}
+export const streamUrl = (id: string) => `${API_BASE}/stream/${id}${devQuery()}`
+export const thumbUrl = (id: string) => `${API_BASE}/thumb/${id}${devQuery()}`
 
 export function logPlay(songId: string, seconds: number) {
   if (demo) return

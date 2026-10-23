@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { useCurrent, usePlayer } from '../store/player'
 import { useShortcuts } from '../lib/useShortcuts'
 import { Banners } from './Banners'
+import { ListenTogether, RoomPill } from './ListenTogether'
 import { MobileNav } from './MobileNav'
 import { NowPlaying } from './NowPlaying'
 import { PlayerBar } from './PlayerBar'
@@ -30,6 +31,8 @@ export function Layout() {
   return (
     <div className="app">
       <Banners />
+      <RoomPill />
+      <ListenTogether />
       <Sidebar />
       <main className="main" ref={mainRef}>
         <TopBar />

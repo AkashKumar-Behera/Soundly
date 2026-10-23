@@ -62,6 +62,10 @@ opaque, HttpOnly, SameSite=Lax cookie; D1 stores its SHA-256, so a database leak
 | `GET/PUT/DELETE /api/likes[/:songId]` | user | liked songs |
 | `POST /api/plays`, `GET /api/plays/recent` | user | play history |
 | `GET/POST /api/playlists`, `/:id`, `/:id/songs` | user | playlists |
+| `GET /api/youtube/playlist?list=`, `GET /api/youtube/video?id=`, `POST /api/youtube/import` | member+ | preview a pasted playlist or video link, import a playlist |
+| `GET /api/wrapped?range=&tz=` | user | listening recap (minutes, top songs/artists, clock, best day, persona) |
+| `POST /api/rooms`, `GET /api/rooms/:code/ws` | member+ / user | listening rooms (WebSocket, Durable Object) |
+| `GET /api/agent/ws` | agent token | the agent's push channel (WebSocket, Durable Object) |
 | `GET /api/youtube/search?q=` | member+ | real YouTube results (YouTube Data API), marked if already in the library or requested |
 | `POST/GET /api/requests` | member+ | request a YouTube song, list your requests |
 | `GET /api/admin/requests`, `POST .../:id/approve\|reject\|retry` | admin | approval queue |
@@ -90,6 +94,18 @@ in the Google Cloud project, create an API key restricted to that API, then
 
 Each result carries the real category and duration, so the request rules below (non-music or very long videos need an
 admin) work on real data.
+
+### Durable Objects
+
+Two SQLite-backed Durable Objects (free plan), declared in `wrangler.jsonc`:
+
+- **`AgentHub`** (one instance): the laptop agent's outbound WebSocket. The Worker calls it to push `wake` whenever a
+  job becomes claimable (new queued request, approval, retry), so the agent never polls. It also holds the agent's
+  live status for the admin panel.
+- **`Room`** (one per room code): the authoritative state of a listening room (queue, track, playing, position at a
+  server timestamp), broadcast to everyone in it. Anyone can control playback. Clients correct drift against the
+  server clock, "song ended" reports are idempotent (`next` carries the index it came from), and an idle room
+  deletes itself after 6 hours. WebSocket upgrades check the Origin and the session cookie.
 
 ### Job states
 

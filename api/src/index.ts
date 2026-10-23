@@ -4,6 +4,7 @@ import { admin } from './routes/admin'
 import { adminManage } from './routes/admin-manage'
 import { agent } from './routes/agent'
 import { auth } from './routes/auth'
+import { rooms } from './routes/rooms'
 import { likes, me, plays } from './routes/library'
 import { playlists } from './routes/playlists'
 import { requests } from './routes/requests'
@@ -40,6 +41,7 @@ app.route('/api/playlists', playlists)
 app.route('/api/requests', requests)
 app.route('/api/youtube', youtube)
 app.route('/api/wrapped', wrapped)
+app.route('/api/rooms', rooms)
 app.route('/api/admin', admin)
 app.route('/api/admin', adminManage)
 app.route('/api/agent', agent)
@@ -49,5 +51,8 @@ app.onError((err, c) => {
   console.error(err)
   return c.json({ error: 'internal_error' }, 500)
 })
+
+export { AgentHub } from './do/agent-hub'
+export { Room } from './do/room'
 
 export default app

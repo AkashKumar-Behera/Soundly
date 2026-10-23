@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { ChevronDown, Heart, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronDown, Heart, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { lyrics } from '../data/mock'
 import { useApp } from '../store/app'
 import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
+import { useRoom } from '../store/room'
 import { useUi } from '../store/ui'
 import { Cover } from './Cover'
 import { CurrentTime, ProgressBar, TotalTime } from './ProgressBar'
@@ -69,6 +70,8 @@ function Content() {
   const liked = useLibrary((s) => (song ? s.liked.includes(song.id) : false))
   const toggleLike = useLibrary((s) => s.toggleLike)
   const close = useUi((s) => s.setNowPlaying)
+  const setRoomModal = useUi((s) => s.setRoomModal)
+  const inRoom = useRoom((s) => !!s.code)
   const [tab, setTab] = useState<Tab>('lyrics')
 
   if (!song) return null
@@ -94,7 +97,9 @@ function Content() {
           <ChevronDown size={28} />
         </button>
         <span>Playing from your library</span>
-        <span className="np-spacer" />
+        <button className={`icon-btn ${inRoom ? 'on' : ''}`} aria-label="Listen together" onClick={() => setRoomModal(true)}>
+          <Users size={22} />
+        </button>
       </div>
 
       <div className="np-body">

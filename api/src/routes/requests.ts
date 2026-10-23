@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireUser } from '../auth'
 import { createJob } from '../lib/jobs'
+import { wakeAgent } from '../lib/wake'
 import type { AppEnv } from '../types'
 
 export const requests = new Hono<AppEnv>()
@@ -63,7 +64,10 @@ requests.post('/', async (c) => {
     category: body.category,
     url: body.url,
   })
-  if (r.ok) return c.json({ id: r.id, status: r.status, flags: r.flags }, 201)
+  if (r.ok) {
+    if (r.status === 'queued') wakeAgent(c.env, c.executionCtx)
+    return c.json({ id: r.id, status: r.status, flags: r.flags }, 201)
+  }
 
   const status = r.error === 'invalid_request' ? 400 : r.error === 'daily_limit_reached' ? 429 : 409
   return c.json({ error: r.error, songId: r.songId, limit: r.limit }, status)
