@@ -614,3 +614,13 @@ img {
 .artist-found {
   margin-bottom: 8px;
 }
+
+.artist-card .artist-pic {
+  width: 150px;
+  height: 150px;
+  min-height: 150px;
+  aspect-ratio: 1;
+}
+.artist-card {
+  justify-content: flex-start;
+}
