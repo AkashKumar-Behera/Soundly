@@ -1,4 +1,4 @@
-import { Check, RotateCcw, X } from 'lucide-react'
+import { Check, RotateCcw, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import { RequestProgress, YtThumb } from '../../components/RequestProgress'
@@ -69,6 +69,25 @@ export function QueueTab() {
     void reload()
   }
 
+  const remove = async (id: string) => {
+    try {
+      await api(`/admin/requests/${id}`, { method: 'DELETE' })
+    } catch {
+      showToast('That one changed, refreshing')
+    }
+    void reload()
+  }
+
+  const clearAll = async (status: 'failed' | 'rejected') => {
+    try {
+      const r = await api<{ removed: number }>(`/admin/requests?status=${status}`, { method: 'DELETE' })
+      showToast(`Removed ${r.removed}`)
+    } catch {
+      showToast('Could not clear the list')
+    }
+    void reload()
+  }
+
   const approveAll = async () => {
     await Promise.all(cleanPending.map((j) => api(`/admin/requests/${j.id}/approve`, { method: 'POST', body: {} }).catch(() => {})))
     showToast(`Approved ${cleanPending.length}`)
@@ -83,6 +102,11 @@ export function QueueTab() {
             {f.label} <span className="count">{count(f.id)}</span>
           </button>
         ))}
+        {(filter === 'failed' || filter === 'rejected') && rows.length > 0 && (
+          <button className="btn-pill ghost-right" onClick={() => void clearAll(filter)}>
+            <Trash2 size={16} /> Clear all {rows.length}
+          </button>
+        )}
         {filter === 'pending_approval' && cleanPending.length > 1 && (
           <button className="btn-pill ghost-right" onClick={() => void approveAll()}>
             <Check size={16} /> Approve {cleanPending.length} music requests
@@ -125,6 +149,11 @@ export function QueueTab() {
               {j.status === 'failed' && (
                 <button className="icon-btn" aria-label="Retry" onClick={() => void act(j.id, 'retry')}>
                   <RotateCcw size={18} />
+                </button>
+              )}
+              {(j.status === 'failed' || j.status === 'rejected') && (
+                <button className="icon-btn bad" aria-label="Delete" onClick={() => void remove(j.id)}>
+                  <Trash2 size={18} />
                 </button>
               )}
             </div>

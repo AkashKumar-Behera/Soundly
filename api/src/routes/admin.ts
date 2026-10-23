@@ -50,6 +50,25 @@ admin.post('/requests/:id/reject', async (c) => {
   return c.json({ status: 'rejected' })
 })
 
+// Remove failed or rejected requests from the list (nothing in the library is touched).
+admin.delete('/requests', async (c) => {
+  const status = c.req.query('status')
+  if (status !== 'failed' && status !== 'rejected') return c.json({ error: 'invalid_request' }, 400)
+  await c.env.DB.prepare('DELETE FROM import_items WHERE youtube_id IN (SELECT youtube_id FROM download_jobs WHERE status = ?)').bind(status).run()
+  const res = await c.env.DB.prepare('DELETE FROM download_jobs WHERE status = ?').bind(status).run()
+  await audit(c.env.DB, c.get('user').id, 'request.clear', status, { removed: res.meta.changes })
+  return c.json({ removed: res.meta.changes })
+})
+
+admin.delete('/requests/:id', async (c) => {
+  const id = c.req.param('id')
+  await c.env.DB.prepare("DELETE FROM import_items WHERE youtube_id = (SELECT youtube_id FROM download_jobs WHERE id = ? AND status IN ('failed', 'rejected'))").bind(id).run()
+  const res = await c.env.DB.prepare("DELETE FROM download_jobs WHERE id = ? AND status IN ('failed', 'rejected')").bind(id).run()
+  if (!res.meta.changes) return c.json({ error: 'not_removable' }, 409)
+  await audit(c.env.DB, c.get('user').id, 'request.delete', id)
+  return c.json({ ok: true })
+})
+
 admin.post('/requests/:id/retry', async (c) => {
   const id = c.req.param('id')
   const res = await c.env.DB.prepare(
