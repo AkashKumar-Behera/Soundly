@@ -7,10 +7,19 @@
     { "binding": "DB", "database_name": "soundly", "database_id": "0d949f2e-2cea-4e70-bec2-737692ff3166", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [{ "binding": "SONGS", "bucket_name": "soundly-songs" }],
+  // The same Worker serves the built frontend (../dist) and the API, so cookies are first-party.
+  // Only /api/* runs Worker code; everything else is a static file or the SPA fallback.
+  "assets": {
+    "directory": "../dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
   "vars": {
-    // DEV_AUTH lets you act as a seeded user via the X-Dev-User header. It must be "false" in production
-    // (the `deploy` script forces that). Real sign-in arrives in Phase 3.
+    // DEV_AUTH enables X-Dev-User and /api/auth/dev-login for local work. The `deploy` script forces it to "false".
     "DEV_AUTH": "true",
-    "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173"
+    "ALLOWED_ORIGIN": "http://127.0.0.1:5173,http://localhost:5173",
+    "PUBLIC_URL": "https://soundly-api.akashkumar48874.workers.dev",
+    // Public identifier from Google Cloud Console (not a secret). GOOGLE_CLIENT_SECRET is a Wrangler secret.
+    "GOOGLE_CLIENT_ID": ""
   }
 }

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { admin } from './routes/admin'
 import { agent } from './routes/agent'
+import { auth } from './routes/auth'
 import { likes, me, plays } from './routes/library'
 import { playlists } from './routes/playlists'
 import { requests } from './routes/requests'
@@ -25,6 +26,7 @@ app.use(
 
 app.get('/api/health', (c) => c.json({ ok: true, service: 'soundly-api' }))
 
+app.route('/api/auth', auth)
 app.route('/api/me', me)
 app.route('/api/songs', songs)
 app.route('/api/stream', stream)

@@ -81,7 +81,8 @@ export function toSong(s: ApiSong): Song {
 }
 
 interface LibraryState {
-  status: 'loading' | 'ready'
+  /** `unauth`: the API is reachable but nobody is signed in. */
+  status: 'loading' | 'ready' | 'unauth'
   mode: 'api' | 'demo'
   me: Me | null
   songs: Song[]
@@ -91,6 +92,7 @@ interface LibraryState {
   requests: SongRequest[]
   demoRole: Role
   load: () => Promise<void>
+  logout: () => Promise<void>
   toggleLike: (songId: string) => Promise<void>
   getPlaylist: (id: string) => Promise<{ playlist: Playlist; songs: Song[] } | null>
   searchSongs: (q: string) => Promise<Song[]>
@@ -134,8 +136,13 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       })
       void get().loadRequests()
     } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        setDemo(false)
+        set({ status: 'unauth', mode: 'api', me: null, songs: [], playlists: [], liked: [], recent: [], requests: [] })
+        return
+      }
       // No reachable API (static hosting, or the Worker is down): run on bundled demo data.
-      if (e instanceof ApiError && e.code !== 'api_unavailable' && e.status !== 401 && e.status !== 0) console.error(e)
+      if (e instanceof ApiError && e.code !== 'api_unavailable' && e.status !== 0) console.error(e)
       setDemo(true)
       set({
         status: 'ready',
@@ -148,6 +155,12 @@ export const useLibrary = create<LibraryState>((set, get) => ({
         requests: [],
       })
     }
+  },
+
+  logout: async () => {
+    if (get().mode === 'api') await api('/auth/logout', { method: 'POST', body: {} }).catch(() => {})
+    // A full reload drops the audio element, queue and every cached library list with it.
+    window.location.assign('/login')
   },
 
   toggleLike: async (songId) => {

@@ -1,26 +1,47 @@
 import { createMiddleware } from 'hono/factory'
+import { userFromSession } from './session'
 import type { AppEnv, Env, User } from './types'
+import { USER_COLUMNS } from './types'
 
-const DEV_DEFAULT_USER = 'akashkumar48874@gmail.com'
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+function allowedOrigins(env: Env): string[] {
+  const extra = String(env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+  return [new URL(env.PUBLIC_URL).origin, ...extra]
+}
 
 /**
- * Phase 2 stand-in for real sessions. With DEV_AUTH=true the caller is whichever seeded user the
- * X-Dev-User header names (default: the admin). Phase 3 replaces this with Better Auth sessions.
+ * Resolves the caller from the session cookie. In local dev (DEV_AUTH=true) an X-Dev-User header may stand in
+ * for a session. Cookie-authenticated writes must come from an allowed Origin, which blocks cross-site forgery.
  */
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
-  if (c.env.DEV_AUTH !== 'true') return c.json({ error: 'unauthorized' }, 401)
+  let user = await userFromSession(c)
 
-  const email = c.req.header('X-Dev-User') ?? DEV_DEFAULT_USER
-  const user = await c.env.DB.prepare(
-    'SELECT id, email, name, role, can_request_direct, daily_request_limit, pro_until, disabled FROM users WHERE email = ?',
-  )
-    .bind(email)
-    .first<User>()
+  if (user) {
+    if (!SAFE_METHODS.has(c.req.method)) {
+      const origin = c.req.header('Origin')
+      if (!origin || !allowedOrigins(c.env).includes(origin)) return c.json({ error: 'bad_origin' }, 403)
+    }
+  } else if (c.env.DEV_AUTH === 'true') {
+    const email = c.req.header('X-Dev-User')
+    if (email) {
+      user = await c.env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users u WHERE u.email = ?`).bind(email).first<User>()
+    }
+  }
 
   if (!user) return c.json({ error: 'unauthorized' }, 401)
   if (user.disabled) return c.json({ error: 'account_disabled' }, 403)
 
   c.set('user', user)
+  // Best-effort "last seen", at most every 5 minutes per user.
+  c.executionCtx.waitUntil(
+    c.env.DB.prepare("UPDATE users SET last_seen_at = datetime('now') WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-5 minutes'))")
+      .bind(user.id)
+      .run(),
+  )
   await next()
 })
 

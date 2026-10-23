@@ -164,7 +164,7 @@ admin.post('/invites', async (c) => {
   const [users, max] = await Promise.all([db.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>(), getSetting(db, 'max_users', 30)])
   if ((users?.n ?? 0) >= max) return c.json({ error: 'user_limit_reached', max }, 409)
 
-  const bytes = crypto.getRandomValues(new Uint8Array(5))
+  const bytes = crypto.getRandomValues(new Uint8Array(8))
   const code = `SND-${Array.from(bytes, (b) => (b % 36).toString(36)).join('').toUpperCase()}`
   const days = Math.max(1, Math.min(Math.floor(Number(body.expiresInDays) || 7), 90))
   await db
@@ -172,5 +172,5 @@ admin.post('/invites', async (c) => {
     .bind(code, role, c.get('user').id, `+${days} days`)
     .run()
   await audit(db, c.get('user').id, 'invite.create', code, { role, days })
-  return c.json({ code, role, expiresInDays: days }, 201)
+  return c.json({ code, role, expiresInDays: days, link: `${c.env.PUBLIC_URL}/login?invite=${code}` }, 201)
 })

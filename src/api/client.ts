@@ -9,18 +9,22 @@ export const setDemo = (value: boolean) => {
   demo = value
 }
 
-// Phase 2 only: acts as a seeded user through the X-Dev-User header. Phase 3 replaces this with real sessions.
+// Local development only. The dev server can act as a seeded user through the X-Dev-User header. An empty value
+// means "use the real session cookie", so the login flow can be tried locally. Production builds never send it.
+export const DEV_ADMIN = 'akashkumar48874@gmail.com'
+
 export function getDevUser(): string | null {
+  if (!import.meta.env.DEV) return null
   try {
-    return localStorage.getItem(DEV_USER_KEY)
+    const stored = localStorage.getItem(DEV_USER_KEY)
+    return stored === null ? DEV_ADMIN : stored || null
   } catch {
-    return null
+    return DEV_ADMIN
   }
 }
-export function setDevUser(email: string | null) {
+export function setDevUser(email: string) {
   try {
-    if (email) localStorage.setItem(DEV_USER_KEY, email)
-    else localStorage.removeItem(DEV_USER_KEY)
+    localStorage.setItem(DEV_USER_KEY, email)
   } catch {
     // storage unavailable; the default dev user applies
   }

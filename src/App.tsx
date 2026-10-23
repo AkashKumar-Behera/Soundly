@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
@@ -41,6 +41,16 @@ export default function App() {
     void load()
   }, [load])
   if (status === 'loading') return <div className="boot" aria-busy="true" />
+  if (status === 'unauth') {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+    )
+  }
   return (
     <BrowserRouter>
       <Routes>

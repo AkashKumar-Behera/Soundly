@@ -20,17 +20,41 @@ npx wrangler r2 object put soundly-songs/songs/s1.mp3 --file=./some.mp3 --conten
 
 `.dev.vars` (gitignored) holds `AGENT_TOKEN`, the shared secret for the laptop agent.
 
-## Auth (Phase 2 stand-in)
+## Auth
 
-With `DEV_AUTH=true` you act as a seeded user by sending `X-Dev-User: <email>`; no header means the admin.
-Seeded users: `akashkumar48874@gmail.com` (admin), `trusted@example.com`, `member@example.com`.
-`npm run deploy` forces `DEV_AUTH=false`, so a deployed Worker rejects everything until Phase 3 adds real sign-in.
+Google sign-in (OAuth code flow with PKCE and a `state` check) creates a server-side session. The browser only holds an
+opaque, HttpOnly, SameSite=Lax cookie; D1 stores its SHA-256, so a database leak does not expose live sessions.
+
+- **Invite only.** A new Google account can join only with an unused, unexpired invite code, and only while the user
+  count is below `max_users` (30). Existing accounts, including the seeded owner, sign in by email with no invite.
+- **Invites** are one-time, 8 characters, 7 days, created by an admin (`POST /api/admin/invites` or Settings > Invites).
+- **CSRF.** Cookie-authenticated writes must send an allowed `Origin` (the app itself), otherwise `403 bad_origin`.
+- **Disabled users** are rejected immediately, including on existing sessions.
+- **Local dev.** With `DEV_AUTH=true` you can act as a seeded user via `X-Dev-User`, or sign in through
+  `POST /api/auth/dev-login` (the login page shows a dev form). Production forces `DEV_AUTH=false`, which also
+  removes `dev-login` (404). Seeded users: `akashkumar48874@gmail.com` (admin), `trusted@`, `member@`, `listener@example.com`.
+
+### Google setup (one time)
+
+1. Google Cloud Console > create a project > **APIs & Services > OAuth consent screen**: External, app name Soundly,
+   your email, scopes `openid`, `email`, `profile` only. Then **Publish app** (basic scopes need no verification).
+2. **Credentials > Create credentials > OAuth client ID > Web application**.
+   - Authorized JavaScript origins: `https://soundly-api.akashkumar48874.workers.dev` and `http://127.0.0.1:5173`
+   - Authorized redirect URIs: `https://soundly-api.akashkumar48874.workers.dev/api/auth/google/callback` and
+     `http://127.0.0.1:5173/api/auth/google/callback`
+3. Put the **client ID** (public) in `wrangler.jsonc` under `vars.GOOGLE_CLIENT_ID`.
+4. Store the **client secret** as a Wrangler secret (it never goes in a file): `npx wrangler secret put GOOGLE_CLIENT_SECRET`.
+   For local testing add `GOOGLE_CLIENT_SECRET=...` to `api/.dev.vars` (gitignored).
+5. `npm run deploy`.
 
 ## Endpoints
 
 | Route | Who | What |
 |---|---|---|
 | `GET /api/health` | anyone | liveness |
+| `GET /api/auth/google/start`, `/callback` | anyone | Google sign-in |
+| `GET /api/auth/invite/:code` | anyone | is this invite usable? |
+| `POST /api/auth/logout` | user | end the session |
 | `GET /api/me` | user | profile, role, request limits, Pro status |
 | `GET /api/songs?q=&limit=&offset=` | user | library search |
 | `GET /api/stream/:id` | user | audio with HTTP Range (seeking) |
@@ -68,15 +92,15 @@ Live Worker: `https://soundly-api.akashkumar48874.workers.dev` (Cloudflare accou
 | R2 bucket | `soundly-songs` |
 | Secret | `AGENT_TOKEN` (also saved locally in `.prod-agent-token`, which is gitignored) |
 
-Production runs with `DEV_AUTH=false`, so user routes answer 401 until Phase 3 adds sign-in. The agent routes work
+The same Worker also serves the built frontend (`../dist`) from static assets, so the app and API share one origin and
+cookies are first-party. Only `/api/*` runs Worker code. Production runs with `DEV_AUTH=false`. The agent routes work
 with the bearer token. Existing buckets in the account (`r2bucket`, `saajcraft`) are not used.
 
 Redeploy after changes:
 
 ```bash
-npm run deploy                         # forces DEV_AUTH=false
+npm run deploy                         # builds the frontend, forces DEV_AUTH=false
 npm run db:migrate:remote              # when you add a migration
 npx wrangler d1 execute soundly --remote --file=./seed.prod.sql
 ```
 
-Set `ALLOWED_ORIGIN` (wrangler.jsonc `vars`) to the frontend's real origin once it is hosted.
