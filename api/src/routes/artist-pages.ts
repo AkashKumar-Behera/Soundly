@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { canRequestDirect, requireUser } from '../auth'
+import { autoAddable } from '../lib/autofilter'
 import { createJob } from '../lib/jobs'
 import { wakeAgent } from '../lib/wake'
 import { ytmArtists, ytmArtistSongs } from '../lib/ytm'
@@ -15,7 +16,7 @@ const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
 
 /** Queues every missing song of an artist. Returns how many were queued. */
 export async function queueArtist(env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }, user: User, browseId: string, max: number): Promise<{ queued: number; skipped: number }> {
-  const songs = await ytmArtistSongs(browseId, max)
+  const songs = await autoAddable(env.DB, await ytmArtistSongs(browseId, max))
   let queued = 0
   let skipped = 0
   for (const s of songs) {

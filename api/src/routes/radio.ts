@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { canRequestDirect, requireUser } from '../auth'
+import { autoAddable } from '../lib/autofilter'
 import { createJob } from '../lib/jobs'
 import { wakeAgent } from '../lib/wake'
 import { ytmRadio } from '../lib/ytm'
@@ -50,9 +51,10 @@ radio.get('/:songId', async (c) => {
     const seeds = await db.prepare("SELECT COUNT(*) AS n FROM yt_searches WHERE user_id = ? AND q LIKE 'rd:%' AND created_at >= date('now')").bind(user.id).first<{ n: number }>()
     if (!done && (seeds?.n ?? 0) < SEEDS_PER_USER_DAILY) {
       await db.prepare('INSERT INTO yt_searches (user_id, q) VALUES (?, ?)').bind(user.id, key).run()
+      const allowed = new Set((await autoAddable(db, items.filter((i) => !i.songId && !i.requestStatus))).map((t) => t.youtubeId))
       for (const it of items) {
         if (requested >= MAX_DOWNLOADS) break
-        if (it.songId || it.requestStatus) continue
+        if (it.songId || it.requestStatus || !allowed.has(it.youtubeId)) continue
         const r = await createJob(db, user, { youtubeId: it.youtubeId, title: it.title, channel: it.channel, durationSec: it.durationSec, category: it.category }, { skipDailyLimit: true })
         if (r.ok) {
           requested += 1
