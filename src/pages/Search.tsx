@@ -32,6 +32,9 @@ const statusLabel: Record<string, string> = {
   uploading: 'Uploading',
 }
 
+// Matches the server default for max_duration_sec; longer videos always need an admin.
+const LONG_SECONDS = 1200
+
 type YtState = { q: string; phase: 'loading' | 'done' | 'error'; results: YoutubeResult[]; error?: string }
 
 export function Search() {
@@ -147,6 +150,7 @@ export function Search() {
               <div className="truncate muted">
                 {v.channel} · {formatTime(v.durationSec)}
                 {v.category !== 'Music' && <span className="flag">{v.category}</span>}
+                {v.durationSec > LONG_SECONDS && <span className="flag">Very long</span>}
               </div>
             </div>
             {v.songId ? (
@@ -156,7 +160,7 @@ export function Search() {
             ) : (
               <button className="btn-pill" onClick={() => void request(v)}>
                 <Download size={16} />
-                {direct && v.category === 'Music' ? 'Add to queue' : 'Request song'}
+                {direct && v.category === 'Music' && v.durationSec <= LONG_SECONDS ? 'Add to queue' : 'Request song'}
               </button>
             )}
           </div>
