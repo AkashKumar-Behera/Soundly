@@ -9,6 +9,7 @@ interface AdminUser {
   id: string
   email: string
   name: string
+  avatarUrl: string | null
   role: string
   canRequestDirect: number
   dailyRequestLimit: number
@@ -47,44 +48,64 @@ export function UsersTab() {
   }
 
   return (
-    <div className="rows">
+    <div className="users-grid">
       {data?.users.map((u) => {
         const me = u.id === meId
+        const online = !!u.lastSeenAt && Date.now() - new Date(u.lastSeenAt.replace(' ', 'T') + 'Z').getTime() < 5 * 60000
         return (
           <div key={u.id} className={`user-card ${u.disabled ? 'off' : ''}`}>
             <div className="user-head">
-              <div className="avatar">{u.name.slice(0, 1).toUpperCase()}</div>
+              <div className="user-avatar">
+                {u.avatarUrl ? <img src={u.avatarUrl} alt="" referrerPolicy="no-referrer" /> : <span>{u.name.slice(0, 1).toUpperCase()}</span>}
+                <i className={`dot ${online ? 'on' : ''}`} title={online ? 'Online now' : 'Offline'} />
+              </div>
               <div className="min0 grow">
-                <div className="truncate strong">
-                  {u.name} {me && <span className="muted">(you)</span>} {isPro(u) && <span className="pro"><Crown size={11} /> PRO</span>}
+                <div className="user-name">
+                  <span className="truncate strong">{u.name}</span>
+                  {me && <span className="muted">(you)</span>}
+                  <span className={`role-badge ${u.role}`}>{u.role}</span>
+                  {isPro(u) && (
+                    <span className="pro">
+                      <Crown size={11} /> PRO
+                    </span>
+                  )}
                   {u.disabled ? <span className="flag">Disabled</span> : null}
                 </div>
-                <div className="truncate muted">
-                  {u.email} · joined {timeAgo(u.createdAt)} · seen {timeAgo(u.lastSeenAt)}
+                <div className="truncate muted">{u.email}</div>
+                <div className="truncate muted small">
+                  Joined {timeAgo(u.createdAt)} · seen {online ? 'now' : timeAgo(u.lastSeenAt)}
                 </div>
               </div>
             </div>
 
-            <div className="user-stats muted">
-              <span>{u.playCount} plays</span>
-              <span>{u.minutesListened} min</span>
-              <span>{u.requestCount} requests</span>
-              <span>
-                {u.songsAdded} songs · {formatBytes(u.storageBytes)}
-              </span>
+            <div className="user-tiles">
+              <div>
+                <b>{u.playCount}</b>
+                <span>plays</span>
+              </div>
+              <div>
+                <b>{u.minutesListened}</b>
+                <span>minutes</span>
+              </div>
+              <div>
+                <b>{u.requestCount}</b>
+                <span>requests</span>
+              </div>
+              <div>
+                <b>{u.songsAdded}</b>
+                <span>{formatBytes(u.storageBytes)}</span>
+              </div>
+            </div>
+
+            <div className="role-pills" role="radiogroup" aria-label="Role">
+              {ROLES.map((r) => (
+                <button key={r} role="radio" aria-checked={u.role === r} className={u.role === r ? 'on' : ''} disabled={busy === u.id || me} onClick={() => u.role !== r && void patch(u, { role: r })}>
+                  {r}
+                </button>
+              ))}
             </div>
 
             <div className="user-controls">
-              <label>
-                Role
-                <select value={u.role} disabled={busy === u.id || me} onChange={(e) => void patch(u, { role: e.target.value })}>
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label>
                 Daily requests
                 <input
@@ -96,12 +117,14 @@ export function UsersTab() {
                   onBlur={(e) => Number(e.target.value) !== u.dailyRequestLimit && void patch(u, { dailyRequestLimit: Number(e.target.value) })}
                 />
               </label>
-              <label className="check">
+              <label className="switch">
                 <input type="checkbox" checked={!!u.canRequestDirect} disabled={busy === u.id} onChange={(e) => void patch(u, { canRequestDirect: e.target.checked })} />
+                <i />
                 Skip approval
               </label>
-              <label className="check">
+              <label className="switch">
                 <input type="checkbox" checked={!!u.disabled} disabled={busy === u.id || me} onChange={(e) => void patch(u, { disabled: e.target.checked })} />
+                <i />
                 Disabled
               </label>
               {isPro(u) ? (

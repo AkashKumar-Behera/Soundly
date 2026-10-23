@@ -648,3 +648,170 @@ img {
   background: rgb(0 0 0 / 0.55);
   line-height: 0;
 }
+
+/* ---------- Admin: users ---------- */
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 520px) {
+  .users-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.user-card {
+  padding: 18px;
+  border-radius: 18px;
+  gap: 14px;
+}
+.user-avatar {
+  position: relative;
+  flex: none;
+  width: 60px;
+  height: 60px;
+}
+.user-avatar img,
+.user-avatar span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(135deg, var(--accent), #0c7a3a);
+  color: var(--accent-ink);
+  font-size: 24px;
+  font-weight: 800;
+}
+.user-avatar .dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6b7280;
+  border: 3px solid var(--panel-2);
+}
+.user-avatar .dot.on {
+  background: #22c55e;
+}
+.user-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 17px;
+}
+.user-head .small {
+  font-size: 12px;
+}
+.role-badge {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.role-badge.admin {
+  background: rgb(255 99 99 / 0.18);
+  color: #ff8a8a;
+}
+.role-badge.trusted {
+  background: rgb(47 150 243 / 0.2);
+  color: #6db6ff;
+}
+.role-badge.member {
+  background: rgb(30 215 96 / 0.16);
+  color: var(--accent);
+}
+.user-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.user-tiles div {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+.user-tiles b {
+  font-size: 20px;
+}
+.user-tiles span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.role-pills {
+  display: flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--panel);
+}
+.role-pills button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.role-pills button.on {
+  background: var(--text);
+  color: var(--bg);
+}
+.role-pills button:disabled:not(.on) {
+  opacity: 0.5;
+}
+.user-controls label.switch {
+  position: relative;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch i {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--hover);
+  transition: background 0.15s;
+}
+.switch i::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.switch input:checked + i {
+  background: var(--accent);
+}
+.switch input:checked + i::after {
+  transform: translateX(16px);
+}
+.switch input:disabled + i {
+  opacity: 0.5;
+}

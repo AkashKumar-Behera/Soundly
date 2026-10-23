@@ -103,7 +103,7 @@ admin.get('/stats', async (c) => {
 // ---------- Users ----------
 admin.get('/users', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.role, u.can_request_direct AS canRequestDirect, u.daily_request_limit AS dailyRequestLimit,
+    `SELECT u.id, u.email, u.name, u.avatar_url AS avatarUrl, u.role, u.can_request_direct AS canRequestDirect, u.daily_request_limit AS dailyRequestLimit,
             u.pro_until AS proUntil, u.contribution_note AS contributionNote, u.disabled, u.created_at AS createdAt, u.last_seen_at AS lastSeenAt,
             (SELECT COUNT(*) FROM download_jobs j WHERE j.user_id = u.id) AS requestCount,
             (SELECT COUNT(*) FROM plays p WHERE p.user_id = u.id) AS playCount,
