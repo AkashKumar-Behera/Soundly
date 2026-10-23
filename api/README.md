@@ -65,7 +65,12 @@ opaque, HttpOnly, SameSite=Lax cookie; D1 stores its SHA-256, so a database leak
 | `GET /api/youtube/search?q=` | member+ | real YouTube results (YouTube Data API), marked if already in the library or requested |
 | `POST/GET /api/requests` | member+ | request a YouTube song, list your requests |
 | `GET /api/admin/requests`, `POST .../:id/approve\|reject\|retry` | admin | approval queue |
-| `GET /api/admin/stats`, `GET/PATCH /api/admin/users`, `GET/POST /api/admin/invites` | admin | dashboard, users, invites |
+| `GET /api/admin/stats`, `GET /api/admin/analytics?days=` | admin | dashboard numbers, plays/requests per day, top songs and listeners |
+| `GET/PATCH /api/admin/users[/:id]` | admin | users with usage (plays, minutes, songs added, storage), role, limits, Pro, disable |
+| `GET/POST /api/admin/invites`, `DELETE /api/admin/invites/:code` | admin | create and revoke invites |
+| `GET /api/admin/songs`, `PATCH/DELETE /api/admin/songs/:id` | admin | library list, edit metadata, delete (removes audio and cover from R2) |
+| `GET/PATCH /api/admin/settings` | admin | max users, longest song, import size, agent window |
+| `GET /api/admin/audit` | admin | who did what
 | `POST /api/agent/heartbeat\|claim`, `PUT /api/agent/upload`, `POST /api/agent/jobs/:id/...` | agent token | laptop agent |
 
 ### Request rules

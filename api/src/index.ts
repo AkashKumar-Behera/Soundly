@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { admin } from './routes/admin'
+import { adminManage } from './routes/admin-manage'
 import { agent } from './routes/agent'
 import { auth } from './routes/auth'
 import { likes, me, plays } from './routes/library'
@@ -38,6 +39,7 @@ app.route('/api/playlists', playlists)
 app.route('/api/requests', requests)
 app.route('/api/youtube', youtube)
 app.route('/api/admin', admin)
+app.route('/api/admin', adminManage)
 app.route('/api/agent', agent)
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))

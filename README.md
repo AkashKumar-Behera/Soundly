@@ -18,6 +18,7 @@ A private, invite-only music streaming web app (PWA), inspired by the layout of 
 - Full-screen Now Playing with three screens (Classic, Immersive, Vinyl), lyrics and queue
 - Themes: dark, light, system; interface styles: Classic and Blend
 - Search with a "Request song" flow and a Requests page (role aware demo)
+- Admin panel: analytics, request queue, song edit/delete, users (roles, limits, Pro, usage), invites, limits, activity log
 - Real YouTube search, and a laptop agent that downloads approved requests to R2 (home Wi-Fi only)
 - Google sign-in, invite-only signup, sessions and roles (the login screen and admin invite manager)
 - Connected to the API: songs, streaming, playlists, likes, play history, requests and admin approvals. If the API is not reachable the app falls back to bundled demo data
@@ -38,5 +39,5 @@ The Vite dev server proxies `/api` to the Worker on port 8787. Without the API t
 2. Cloudflare Worker API, D1 schema, R2 storage (done: songs, Range streaming, playlists, likes, plays, requests and approvals, admin, agent endpoints)
 3. Login (Google), invites, roles (done; add your Google client ID to switch it on)
 4. Download queue and laptop agent (done: see [agent/README.md](agent/README.md); real YouTube search via the YouTube Data API)
-5. Admin panel and analytics
+5. Admin panel and analytics (done: `/admin` with overview and charts, request queue, songs, users, invites, settings, activity log)
 6. Social features, PWA polish, deploy

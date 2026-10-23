@@ -80,7 +80,7 @@ admin.get('/stats', async (c) => {
 
   return c.json({
     users: { count: users?.n ?? 0, max: maxUsers },
-    songs: { count: songs?.n ?? 0, storageBytes: songs?.bytes ?? 0 },
+    songs: { count: songs?.n ?? 0, storageBytes: songs?.bytes ?? 0, freeLimitBytes: 10 * 1024 ** 3 },
     jobs: Object.fromEntries(jobs.results.map((r) => [r.status, r.n])),
     playsLast7Days: plays?.n ?? 0,
     agent: agent
@@ -95,7 +95,10 @@ admin.get('/users', async (c) => {
     `SELECT u.id, u.email, u.name, u.role, u.can_request_direct AS canRequestDirect, u.daily_request_limit AS dailyRequestLimit,
             u.pro_until AS proUntil, u.contribution_note AS contributionNote, u.disabled, u.created_at AS createdAt, u.last_seen_at AS lastSeenAt,
             (SELECT COUNT(*) FROM download_jobs j WHERE j.user_id = u.id) AS requestCount,
-            (SELECT COUNT(*) FROM plays p WHERE p.user_id = u.id) AS playCount
+            (SELECT COUNT(*) FROM plays p WHERE p.user_id = u.id) AS playCount,
+            (SELECT COALESCE(SUM(p.seconds_listened), 0) / 60 FROM plays p WHERE p.user_id = u.id) AS minutesListened,
+            (SELECT COUNT(*) FROM songs s WHERE s.added_by = u.id) AS songsAdded,
+            (SELECT COALESCE(SUM(s.size_bytes), 0) FROM songs s WHERE s.added_by = u.id) AS storageBytes
      FROM users u ORDER BY u.created_at`,
   ).all()
   return c.json({ users: results })

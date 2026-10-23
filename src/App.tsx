@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="playlist/:id" element={<Playlist />} />
           <Route path="requests" element={<Requests />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="admin" element={<Admin />} />
         </Route>
       </Routes>
     </BrowserRouter>

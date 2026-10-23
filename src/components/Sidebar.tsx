@@ -1,4 +1,4 @@
-import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings } from 'lucide-react'
+import { Crown, Heart, House, Inbox, Library, Plus, Search, Settings, ShieldCheck } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useLibrary, useRole } from '../store/library'
 import { Cover } from './Cover'
@@ -27,7 +27,7 @@ export function Sidebar() {
       </div>
 
       <nav className="nav">
-        {nav.map(({ to, label, icon: Icon, end }) => (
+        {(role === 'admin' ? [...nav, { to: '/admin', label: 'Admin', icon: ShieldCheck, end: false }] : nav).map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Icon size={22} />
             {label}
