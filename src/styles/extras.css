@@ -624,3 +624,27 @@ img {
 .artist-card {
   justify-content: flex-start;
 }
+
+.yt-thumb {
+  width: 56px;
+  height: 56px;
+}
+.yt-thumb img {
+  aspect-ratio: 1;
+  object-position: center;
+}
+
+.yt-thumb {
+  position: relative;
+}
+.yt-badge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  padding: 2px 3px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.55);
+  line-height: 0;
+}

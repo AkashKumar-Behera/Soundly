@@ -41,6 +41,12 @@ export function YoutubeRow({ video, direct, onRequest }: { video: YoutubeResult;
       {v.thumbnail ? (
         <div className="yt-thumb">
           <img src={v.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
+          <span className="yt-badge" aria-label="From YouTube">
+            <svg viewBox="0 0 24 17" width="14" height="10" aria-hidden>
+              <rect width="24" height="17" rx="4.5" fill="#ff0033" />
+              <path d="M9.6 4.8v7.4L16 8.5z" fill="#fff" />
+            </svg>
+          </span>
         </div>
       ) : (
         <Cover hue={hueFromId(v.youtubeId)} size={56} className="r8" />
