@@ -144,13 +144,13 @@ export function Settings() {
       <section className="setting column">
         <div>
           <h3>App logo</h3>
-          <p className="muted">Try the logo designs. This only changes how the logo looks inside the app for now.</p>
+          <p className="muted">Pick the logo you like. It changes inside the app on this device.</p>
         </div>
         <div className="logo-picks">
-          {(['bars', 'blend1', 'blend2', 'blend3'] as const).map((v) => (
+          {(['bars', 'gold'] as const).map((v) => (
             <button key={v} className={`logo-pick ${logo === v ? 'on' : ''}`} onClick={() => setLogo(v)} aria-pressed={logo === v} aria-label={`Logo ${v}`}>
               <Logo size={64} variant={v} />
-              <span>{v === 'bars' ? 'Original' : v.replace('blend', 'Blend ')}</span>
+              <span>{v === 'bars' ? 'Soundly' : 'Gold ring'}</span>
             </button>
           ))}
         </div>

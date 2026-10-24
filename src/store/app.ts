@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type UiStyle = 'classic' | 'blend'
 export type PlayerStyle = 'classic' | 'immersive' | 'vinyl' | 'modern'
-export type LogoChoice = 'bars' | 'blend1' | 'blend2' | 'blend3'
+export type LogoChoice = 'bars' | 'gold'
 
 interface AppState {
   theme: ThemeMode
