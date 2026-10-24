@@ -4,6 +4,7 @@ import { autoAddable } from '../lib/autofilter'
 import { createJob } from '../lib/jobs'
 import { emit } from '../lib/live'
 import { forget, memo } from '../util'
+import { annotate } from './youtube'
 import { wakeAgent } from '../lib/wake'
 import { ytmArtists, ytmArtistSongs } from '../lib/ytm'
 import type { AppEnv, Env, User } from '../types'
@@ -59,6 +60,19 @@ artistPages.get('/', async (c) => {
     }),
   )
   return c.json({ artists: results.map(({ checked: _checked, ...a }) => a) })
+})
+
+/** An artist's songs on YouTube Music (up to 100), marked with what is already in the library or queued. */
+artistPages.get('/:browseId/songs', async (c) => {
+  const id = c.req.param('browseId')
+  if (!/^UC[\w-]{10,40}$/.test(id)) return c.json({ error: 'invalid_request' }, 400)
+  try {
+    const songs = await memo(`artist-songs:${id}`, 10 * 60000, async () => (await ytmArtistSongs(id, 100)).slice(0, 100))
+    return c.json({ songs: await annotate(c.env.DB, songs) })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'youtube_error' }, 502)
+  }
 })
 
 artistPages.get('/search', async (c) => {

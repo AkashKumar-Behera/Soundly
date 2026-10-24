@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { SongRow } from '../components/SongRow'
+import { YoutubeRow } from '../components/YoutubeRow'
 import type { Song } from '../data/mock'
-import { hueFromId, toSong, useLibrary, useRole } from '../store/library'
+import { hueFromId, toSong, useCanRequestDirect, useLibrary, useRole } from '../store/library'
+import type { YoutubeResult } from '../store/library'
 import { usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
 
@@ -31,6 +33,9 @@ export function ArtistPage() {
   const [artist, setArtist] = useState<LibArtist | null>(null)
   const [state, setState] = useState<'idle' | 'busy' | 'queued' | 'pending'>('idle')
   const direct = role === 'trusted' || role === 'admin'
+  const canDirect = useCanRequestDirect()
+  const createRequest = useLibrary((s) => s.createRequest)
+  const [yt, setYt] = useState<YoutubeResult[] | null>(null)
   const sid = `artist:${name}`
 
   useEffect(() => {
@@ -47,6 +52,28 @@ export function ArtistPage() {
       live = false
     }
   }, [name, mode])
+
+  // The artist's other songs from YouTube Music, once we know which artist this is.
+  useEffect(() => {
+    if (!artist?.browseId) return setYt(null)
+    let live = true
+    api<{ songs: YoutubeResult[] }>(`/artists/${artist.browseId}/songs`)
+      .then((d) => live && setYt(d.songs))
+      .catch(() => live && setYt([]))
+    return () => {
+      live = false
+    }
+  }, [artist?.browseId])
+
+  const requestOne = async (v: YoutubeResult) => {
+    const r = await createRequest({ youtubeId: v.youtubeId, title: v.title, channel: v.channel, durationSec: v.durationSec, category: v.category })
+    if (r.ok) {
+      showToast(r.status === 'queued' ? 'Added to the download queue' : 'Request sent for admin approval')
+      setYt((cur) => cur?.map((x) => (x.youtubeId === v.youtubeId ? { ...x, requestStatus: r.status } : x)) ?? cur)
+    } else {
+      showToast(r.error === 'daily_limit_reached' ? 'You have used all of today’s requests' : r.error === 'already_requested' ? 'Someone already requested this song' : 'Request failed')
+    }
+  }
 
   const request = async () => {
     if (!artist?.browseId) return
@@ -108,6 +135,22 @@ export function ArtistPage() {
         ))}
         {songs && !list.length && <p className="muted empty">No songs by {name} yet.</p>}
       </div>
+
+      {role !== 'listener' && (() => {
+        const more = (yt ?? []).filter((v) => !v.songId)
+        return (
+          <>
+            <h2 className="section-title">More by {name}</h2>
+            {yt === null && artist?.browseId && <p className="muted empty">Loading from YouTube…</p>}
+            {yt && !more.length && <p className="muted empty">Everything we found by {name} is already in Soundly.</p>}
+            <div className="yt-list">
+              {more.map((v) => (
+                <YoutubeRow key={v.youtubeId} video={v} direct={canDirect} onRequest={(x) => void requestOne(x)} />
+              ))}
+            </div>
+          </>
+        )
+      })()}
     </>
   )
 }
