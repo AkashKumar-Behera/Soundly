@@ -65,10 +65,22 @@ const audio = new Audio()
 audio.preload = 'auto'
 audio.volume = 0.8
 
+/** Songs you listened to (80%+) are kept on this device, so they replay instantly and work offline. */
+async function keepOnDevice(song: Song) {
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+  if (!navigator.onLine || conn?.saveData) return
+  const { useLibrary } = await import('./library')
+  const me = useLibrary.getState().me
+  if (useLibrary.getState().mode !== 'api' || !me || !(me.isPro || me.role === 'admin' || me.role === 'trusted')) return
+  const { useOffline } = await import('./offline')
+  await useOffline.getState().autoKeep(song)
+}
+
 // Report a play to the API once a song has been listened to for a while (feeds history and analytics).
 let playing: Song | null = null
 function flushPlay() {
   if (playing && audio.currentTime >= 15) logPlay(playing.id, Math.floor(audio.currentTime))
+  if (playing && audio.duration > 0 && audio.currentTime / audio.duration >= 0.8) void keepOnDevice(playing)
   playing = null
 }
 

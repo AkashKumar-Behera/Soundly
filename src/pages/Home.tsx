@@ -1,11 +1,47 @@
 import { Pause, Play, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 import { Card, Shelf } from '../components/Card'
 import { Cover } from '../components/Cover'
 import { greeting } from '../lib/format'
 import { playPlaylist } from '../lib/playlist'
-import { useLibrary } from '../store/library'
+import type { Song } from '../data/mock'
+import { toSong, useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
+
+/** Songs in the library that sound like `seed` (YouTube Music's radio for it), kept for half an hour per song. */
+function useSimilar(seed: Song | undefined): Song[] {
+  const mode = useLibrary((s) => s.mode)
+  const [songs, setSongs] = useState<Song[]>([])
+  useEffect(() => {
+    if (!seed || mode !== 'api') return setSongs([])
+    const key = `soundly.similar.${seed.id}`
+    try {
+      const hit = JSON.parse(localStorage.getItem(key) ?? 'null') as { at: number; songs: Song[] } | null
+      if (hit && Date.now() - hit.at < 30 * 60000) return setSongs(hit.songs)
+    } catch {
+      /* ignore a bad cache entry */
+    }
+    let live = true
+    api<{ songs: Parameters<typeof toSong>[0][] }>(`/radio/${seed.id}`)
+      .then((d) => {
+        const list = d.songs.filter((s) => s.id !== seed.id).map(toSong).slice(0, 14)
+        if (!live) return
+        setSongs(list)
+        try {
+          localStorage.setItem(key, JSON.stringify({ at: Date.now(), songs: list }))
+        } catch {
+          /* full or private: fine */
+        }
+      })
+      .catch(() => live && setSongs([]))
+    return () => {
+      live = false
+    }
+  }, [seed?.id, mode])
+  return songs
+}
 
 export function Home() {
   const navigate = useNavigate()
@@ -21,6 +57,30 @@ export function Home() {
   const mode = useLibrary((s) => s.mode)
 
   const playlistPlaying = (id: string) => playing && sourceId === id
+
+  // "Because you played ...": what you are listening to now (or last), and a second shelf from a different artist.
+  const seedA = current ?? recent[0]
+  const seedB = recent.find((s) => s.artist !== seedA?.artist)
+  const similarA = useSimilar(seedA)
+  const similarB = useSimilar(seedB)
+  const shelf = (seed: Song | undefined, list: Song[]) =>
+    seed && list.length > 0 ? (
+      <Shelf title={`Because you played ${seed.title}`}>
+        {list.map((s, i) => (
+          <Card
+            key={s.id}
+            hue={s.hue}
+            hue2={s.hue2}
+            thumbUrl={s.thumbUrl}
+            title={s.title}
+            subtitle={s.artist}
+            playing={current?.id === s.id && playing}
+            onOpen={() => playQueue(list, i)}
+            onPlay={() => (current?.id === s.id ? toggle() : playQueue(list, i))}
+          />
+        ))}
+      </Shelf>
+    ) : null
 
   return (
     <>
@@ -73,6 +133,8 @@ export function Home() {
 
       {likedCount === 0 && !songs.length && <p className="muted empty">Your library is empty. Search for a song and request it from YouTube.</p>}
 
+      {shelf(seedA, similarA)}
+
       {recent.length > 0 && (
         <Shelf title="Recently played">
           {recent.map((s, i) => (
@@ -90,6 +152,8 @@ export function Home() {
           ))}
         </Shelf>
       )}
+
+      {shelf(seedB, similarB)}
 
       {playlists.length > 0 && (
         <Shelf title="Made for you">

@@ -857,3 +857,166 @@ img {
 .update-icon .spin {
   animation: spin 1s linear infinite;
 }
+
+/* ---------- AAC badge ---------- */
+.aac-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #ffd36b, #ff9d2e);
+  color: #3a2300;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  line-height: 1.5;
+  vertical-align: 1px;
+}
+
+/* ---------- Phones: layout fixes ---------- */
+.pl-actions .play-btn,
+.pl-actions .icon-btn {
+  flex: none;
+}
+.play-btn.xl {
+  aspect-ratio: 1;
+  flex: none;
+}
+.pl-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 860px) {
+  .page-title-row {
+    flex-wrap: wrap;
+  }
+  .page-title {
+    white-space: nowrap;
+    font-size: 28px;
+  }
+  .title-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .title-actions .btn-pill {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .pl-head {
+    align-items: center;
+    text-align: center;
+    padding-top: 8px;
+  }
+  .pl-art {
+    width: 168px;
+    height: 168px;
+  }
+  .pl-info h1 {
+    font-size: clamp(30px, 9vw, 44px);
+    letter-spacing: -1px;
+  }
+  .pl-actions {
+    justify-content: center;
+  }
+  .mobile-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom) * 0.4);
+    backdrop-filter: blur(16px);
+    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 92%, transparent) 38%);
+  }
+  .main {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom) * 0.4);
+  }
+  .song-row {
+    height: 62px;
+  }
+  .shelf-row {
+    scroll-snap-type: x proximity;
+  }
+  .artist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .artist-card .artist-pic {
+    width: min(150px, 38vw);
+    height: min(150px, 38vw);
+    min-height: 0;
+  }
+}
+
+/* ---------- Phones: compact, native feeling ---------- */
+@media (max-width: 860px) {
+  .topbar {
+    padding-bottom: 8px;
+  }
+  .search {
+    height: 42px;
+  }
+  .cats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .cat {
+    height: 84px;
+    font-size: 17px;
+    padding: 12px;
+  }
+  .section-title,
+  .shelf-head h2 {
+    font-size: 20px;
+  }
+  .greet {
+    font-size: 26px;
+    margin: 8px 0 14px;
+  }
+  .page-title {
+    margin: 4px 0 12px;
+  }
+  .lead,
+  .muted.lead {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .setting {
+    padding: 14px 0;
+    gap: 12px;
+  }
+  .setting h3 {
+    font-size: 16px;
+  }
+  .setting p {
+    font-size: 13px;
+  }
+  .quick {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .quick-item {
+    height: 52px;
+    font-size: 14px;
+  }
+  .quick-item .cover {
+    width: 52px;
+    height: 52px;
+  }
+  .wrapped-cta {
+    padding: 14px;
+  }
+  .mini {
+    margin: 0 8px 6px;
+    padding: 6px 10px 6px 6px;
+  }
+  .tabs {
+    padding: 4px 0 4px;
+    background: transparent;
+  }
+  .tab {
+    font-size: 10.5px;
+    padding: 2px 6px;
+  }
+  .row {
+    padding: 10px 12px;
+  }
+  .modal-back {
+    padding: 12px;
+  }
+}

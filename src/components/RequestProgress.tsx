@@ -7,7 +7,7 @@ export function YtThumb({ youtubeId, size = 56 }: { youtubeId: string; size?: nu
   const [failed, setFailed] = useState(false)
   if (failed) return <Cover hue={hueFromId(youtubeId)} size={size} className="r8" />
   return (
-    <div className="yt-thumb" style={{ width: Math.round((size * 16) / 9), height: size }}>
+    <div className="yt-thumb" style={{ width: size, height: size }}>
       <img src={`https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
     </div>
   )

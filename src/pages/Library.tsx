@@ -6,10 +6,11 @@ import { SongRow } from '../components/SongRow'
 import type { Song } from '../data/mock'
 import { playPlaylist } from '../lib/playlist'
 import { useLibrary } from '../store/library'
+import { rememberedSongs, useOffline } from '../store/offline'
 import { usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
 
-type Filter = 'playlists' | 'songs' | 'liked'
+type Filter = 'playlists' | 'songs' | 'liked' | 'downloaded'
 
 export function Library() {
   const navigate = useNavigate()
@@ -22,6 +23,10 @@ export function Library() {
   const playlists = useLibrary((s) => s.playlists)
   const likedIds = useLibrary((s) => s.liked)
   const getPlaylist = useLibrary((s) => s.getPlaylist)
+  const saved = useOffline((s) => s.saved)
+  // Songs kept on this device: ones you saved and ones kept after you listened. Works offline too.
+  const remembered = rememberedSongs()
+  const downloaded: Song[] = Object.keys(saved).map((id) => songs.find((s) => s.id === id) ?? remembered[id]).filter((s): s is Song => !!s)
   const mode = useLibrary((s) => s.mode)
   const setCreatePlaylist = useUi((s) => s.setCreatePlaylist)
 
@@ -50,9 +55,9 @@ export function Library() {
         )}
       </div>
       <div className="chips">
-        {(['playlists', 'songs', 'liked'] as Filter[]).map((f) => (
+        {(['playlists', 'songs', 'liked', 'downloaded'] as Filter[]).map((f) => (
           <button key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
-            {f === 'liked' ? 'Liked songs' : f[0].toUpperCase() + f.slice(1)}
+            {f === 'liked' ? 'Liked songs' : f[0].toUpperCase() + f.slice(1)}{f === 'downloaded' && downloaded.length ? ` ${downloaded.length}` : ''}
           </button>
         ))}
       </div>
@@ -84,11 +89,12 @@ export function Library() {
 
       {filter !== 'playlists' && (
         <div className="song-table">
-          {(filter === 'songs' ? songs : likedSongs).map((s, i, arr) => (
+          {(filter === 'songs' ? songs : filter === 'downloaded' ? downloaded : likedSongs).map((s, i, arr) => (
             <SongRow key={s.id} song={s} index={i} onPlay={() => playQueue(arr, i, filter === 'liked' ? 'liked' : null)} />
           ))}
           {filter === 'liked' && !likedSongs.length && <p className="muted empty">Tap the heart on a song to save it here.</p>}
           {filter === 'songs' && !songs.length && <p className="muted empty">No songs yet.</p>}
+          {filter === 'downloaded' && !downloaded.length && <p className="muted empty">Nothing on this device yet. Songs you listen to are kept here automatically, and the ⋯ menu can save any song.</p>}
         </div>
       )}
     </>

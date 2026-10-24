@@ -13,6 +13,24 @@ const AUDIO_CACHE = 'soundly-audio'
 const API_CACHE = 'soundly-api'
 const THUMB_CACHE = 'soundly-thumbs'
 
+/**
+ * Cache migration. A new app version replaces the app shell, but what the user saved on this device (songs, covers)
+ * is carried over untouched. Only the API snapshot is rebuilt when its shape changed. Bump CACHE_SCHEMA and add a step.
+ */
+const CACHE_SCHEMA = 2
+async function migrateCaches() {
+  try {
+    const meta = await caches.open('soundly-meta')
+    const stored = Number((await (await meta.match('/schema'))?.text()) ?? 0)
+    if (stored >= CACHE_SCHEMA) return
+    if (stored < 2) await caches.delete(API_CACHE) // v2: songs gained the "aac" flag, so old library snapshots are stale
+    await meta.put('/schema', new Response(String(CACHE_SCHEMA)))
+  } catch {
+    // never block an update on housekeeping
+  }
+}
+self.addEventListener('activate', (event) => event.waitUntil(migrateCaches()))
+
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 clientsClaim()

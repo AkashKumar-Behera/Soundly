@@ -81,6 +81,16 @@ export function SongsTab() {
       <div className="toolbar">
         <input className="input" placeholder="Search title, artist or album" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="muted">{data ? `${data.songs.length} of ${data.total} songs` : ''}</span>
+        <button
+          className="btn-pill"
+          onClick={() =>
+            void api<{ queued: number }>('/admin/upgrade-aac', { method: 'POST', body: {} })
+              .then((r) => showToast(r.queued ? `${r.queued} songs queued for AAC` : 'Every song is already AAC or waiting'))
+              .catch(() => showToast('Could not queue the upgrade'))
+          }
+        >
+          Upgrade all to AAC
+        </button>
       </div>
 
       {data && !data.songs.length && <p className="muted empty">No songs found.</p>}

@@ -131,7 +131,6 @@ export function Artists() {
             <Avatar name={a.name} url={a.imageUrl} id={a.id} size={150} />
             <div className="truncate strong">{a.name}</div>
             <div className="muted">{a.songCount} song{a.songCount === 1 ? '' : 's'}</div>
-            {button(a.browseId, a.name, a.imageUrl)}
           </div>
         ))}
       </div>

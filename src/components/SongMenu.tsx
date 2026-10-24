@@ -1,4 +1,4 @@
-import { ArrowDownToLine, Check, Heart, ListEnd, ListPlus, ListStart, Mic2, Radio, Trash2, UserRound, X } from 'lucide-react'
+import { ArrowDownToLine, Check, Gem, Heart, ListEnd, ListPlus, ListStart, Mic2, Radio, Trash2, UserRound, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
@@ -109,6 +109,18 @@ function SongMenu() {
         <Item icon={saved ? <Check size={18} /> : <ArrowDownToLine size={18} />} onClick={done(() => void toggleOffline(song))}>
           {saved ? 'Remove from this device' : 'Save for offline'}
         </Item>
+        {mode === 'api' && song.aac === false && role !== 'listener' && (
+          <Item
+            icon={<Gem size={18} />}
+            onClick={done(() => {
+              api<{ status: 'queued' | 'pending_approval' }>(`/songs/${song.id}/upgrade`, { method: 'POST', body: {} })
+                .then((r) => showToast(r.status === 'queued' ? 'AAC version queued' : 'Sent to the admin for approval'))
+                .catch((e) => showToast(e instanceof ApiError && e.code === 'already_requested' ? 'Already waiting in the queue' : e instanceof ApiError && e.code === 'daily_limit_reached' ? 'You have used today’s requests' : 'Could not request that'))
+            })}
+          >
+            Request AAC version
+          </Item>
+        )}
         {canLyrics && (
           <Item icon={<Mic2 size={18} />} onClick={() => setLyrics(song)}>
             Add or fix lyrics

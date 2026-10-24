@@ -125,6 +125,7 @@ interface ApiSong {
   duration: number | null
   hasThumb: boolean
   youtubeId: string | null
+  aac?: boolean
   liked: boolean
 }
 
@@ -147,6 +148,7 @@ export function toSong(s: ApiSong): Song {
     hue2: (hue + 55) % 360,
     src: streamUrl(s.id),
     thumbUrl: s.hasThumb ? thumbUrl(s.id) : undefined,
+    aac: s.aac,
   }
 }
 

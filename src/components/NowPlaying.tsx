@@ -8,6 +8,7 @@ import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
 import { useRoom } from '../store/room'
 import { useUi } from '../store/ui'
+import { AacBadge } from './AacBadge'
 import { Cover } from './Cover'
 import { CurrentTime, ProgressBar, TotalTime } from './ProgressBar'
 import { coverHues } from '../lib/coverColor'
@@ -94,7 +95,10 @@ function Content({ controls }: { controls: DragControls }) {
           <div className="np-meta">
             <div className="min0">
               <h1 className="truncate">{song.title}</h1>
-              <p className="truncate">{song.artist}</p>
+              <p className="truncate">
+                <AacBadge song={song} />
+                {song.artist}
+              </p>
             </div>
             <button
               className={`like ${liked ? 'on' : ''}`}

@@ -14,7 +14,36 @@ interface OfflineState {
   saveMany: (songs: Song[], onProgress?: (done: number, total: number) => void) => Promise<number>
   remove: (id: string) => Promise<void>
   clear: () => Promise<void>
+  /** Quietly keeps a song you listened to (oldest auto-kept songs are dropped past the limit). */
+  autoKeep: (song: Song) => Promise<void>
 }
+
+const META_KEY = 'soundly.device-songs'
+const AUTO_KEY = 'soundly.auto-kept'
+const AUTO_LIMIT = 40
+
+const readJson = <T,>(key: string, fallback: T): T => {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? '') as T
+  } catch {
+    return fallback
+  }
+}
+const writeJson = (key: string, value: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* private mode: it just will not be remembered */
+  }
+}
+
+/** Enough about a saved song to list it offline (the library API is not reachable then). */
+export function rememberSong(song: Song) {
+  const meta = readJson<Record<string, Song>>(META_KEY, {})
+  meta[song.id] = { id: song.id, title: song.title, artist: song.artist, album: song.album, duration: song.duration, hue: song.hue, hue2: song.hue2, src: song.src, thumbUrl: song.thumbUrl, aac: song.aac }
+  writeJson(META_KEY, meta)
+}
+export const rememberedSongs = (): Record<string, Song> => readJson<Record<string, Song>>(META_KEY, {})
 
 const urlFor = (song: Song) => new URL(song.src, window.location.origin).href
 const idFromUrl = (url: string) => new URL(url).pathname.split('/').pop() ?? ''
@@ -61,6 +90,7 @@ export const useOffline = create<OfflineState>((set, get) => ({
       const cache = await caches.open(AUDIO_CACHE)
       await cache.put(urlFor(song), new Response(body, { status: 200, headers: { 'Content-Type': body.type, 'Content-Length': String(body.size) } }))
       set((s) => ({ saved: { ...s.saved, [song.id]: body.size } }))
+      rememberSong(song)
       return true
     } catch {
       return false
@@ -86,6 +116,9 @@ export const useOffline = create<OfflineState>((set, get) => ({
     if (!cachesSupported()) return
     const cache = await caches.open(AUDIO_CACHE)
     await cache.delete(new URL(`/api/stream/${id}`, window.location.origin).href)
+    const meta = readJson<Record<string, Song>>(META_KEY, {})
+    delete meta[id]
+    writeJson(META_KEY, meta)
     set((s) => {
       const saved = { ...s.saved }
       delete saved[id]
@@ -95,6 +128,19 @@ export const useOffline = create<OfflineState>((set, get) => ({
 
   clear: async () => {
     if (cachesSupported()) await caches.delete(AUDIO_CACHE)
+    writeJson(META_KEY, {})
+    writeJson(AUTO_KEY, [])
     set({ saved: {} })
+  },
+
+  autoKeep: async (song) => {
+    if (!cachesSupported() || get().saved[song.id] !== undefined || get().busy[song.id] !== undefined) return
+    if (!(await get().save(song))) return
+    const kept = [...readJson<string[]>(AUTO_KEY, []).filter((id) => id !== song.id), song.id]
+    while (kept.length > AUTO_LIMIT) {
+      const oldest = kept.shift() as string
+      await get().remove(oldest)
+    }
+    writeJson(AUTO_KEY, kept)
   },
 }))

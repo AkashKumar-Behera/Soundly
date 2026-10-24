@@ -6,6 +6,7 @@ import { useOffline } from '../store/offline'
 import { useCurrent, usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
 import { useOfflineSave } from '../lib/useOfflineSave'
+import { AacBadge } from './AacBadge'
 import { Cover } from './Cover'
 
 interface Props {
@@ -49,7 +50,10 @@ export function SongRow({ song, index, onPlay, playlistId }: Props) {
         <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} size={42} className="r8" />
         <div className="min0">
           <div className="song-title truncate">{song.title}</div>
-          <div className="song-artist truncate">{song.artist}</div>
+          <div className="song-artist truncate">
+            <AacBadge song={song} />
+            {song.artist}
+          </div>
         </div>
       </div>
       <div className="song-album truncate">{song.album}</div>

@@ -5,6 +5,7 @@ import type { Song } from '../data/mock'
 import { useLibrary } from '../store/library'
 import { usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
+import { AacBadge } from './AacBadge'
 import { Cover } from './Cover'
 import { Lyrics, Queue } from './NpPanels'
 import { CurrentTime, TotalTime } from './ProgressBar'
@@ -127,7 +128,10 @@ export function ModernPlayer({ song, h1, h2, grab }: { song: Song; h1: number; h
             <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} />
           </div>
           <h1 className="md-title">{song.title}</h1>
-          <p className="md-artist">{song.artist}</p>
+          <p className="md-artist">
+            <AacBadge song={song} />
+            {song.artist}
+          </p>
         </div>
       ) : (
         <div className="md-panel">{view === 'lyrics' ? <Lyrics /> : <Queue />}</div>

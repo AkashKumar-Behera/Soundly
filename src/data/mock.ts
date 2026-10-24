@@ -8,6 +8,8 @@ export interface Song {
   src: string
   duration: number
   thumbUrl?: string
+  /** True when the audio is AAC (m4a); older songs are MP3 and can be upgraded. */
+  aac?: boolean
 }
 
 export interface Playlist {
