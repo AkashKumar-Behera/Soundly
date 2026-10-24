@@ -850,3 +850,34 @@ a,
     padding-right: calc(16px + env(safe-area-inset-right));
   }
 }
+
+/* Phones: a solid footer behind the player and tab bar, so page content never shows through or underneath it. */
+@media (max-width: 860px) {
+  :root {
+    --glass: rgb(26 26 31 / 0.94);
+  }
+  :root[data-theme='light'] {
+    --glass: rgb(255 255 255 / 0.95);
+  }
+  .mobile-nav {
+    bottom: 0;
+    padding: 0 10px max(8px, calc(env(safe-area-inset-bottom) - 12px));
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, transparent 0, var(--bg) 22px);
+    padding-top: 22px;
+    gap: 8px;
+  }
+  .mobile-nav > .mini,
+  .mobile-nav > .tabs {
+    margin: 0;
+  }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .mobile-nav {
+    left: 0;
+    right: 0;
+    padding-left: calc(10px + env(safe-area-inset-left));
+    padding-right: calc(10px + env(safe-area-inset-right));
+  }
+}
