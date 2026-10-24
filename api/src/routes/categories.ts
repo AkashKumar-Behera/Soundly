@@ -94,6 +94,16 @@ adminCategories.put('/', async (c) => {
   return c.json({ ok: true })
 })
 
+// Delete a category: its songs go to "Other" (and are not looked up again), and its edits are removed.
+adminCategories.delete('/', async (c) => {
+  const genre = (c.req.query('genre') ?? '').slice(0, 80)
+  if (!genre || genre === OTHER) return c.json({ error: 'invalid_request' }, 400)
+  const moved = await c.env.DB.prepare("UPDATE songs SET genre = NULL, genre_checked_at = datetime('now') WHERE genre = ?").bind(genre).run()
+  await c.env.DB.prepare('DELETE FROM categories WHERE genre = ?').bind(genre).run()
+  forget('categories-raw')
+  return c.json({ moved: moved.meta.changes })
+})
+
 // Look every song up again (e.g. after the lookup got better).
 adminCategories.post('/recheck', async (c) => {
   const r = await c.env.DB.prepare("UPDATE songs SET genre_checked_at = NULL WHERE genre IS NULL").run()

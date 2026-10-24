@@ -881,3 +881,9 @@ a,
     padding-right: calc(10px + env(safe-area-inset-right));
   }
 }
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
