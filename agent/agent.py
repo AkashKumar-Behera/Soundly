@@ -36,7 +36,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.6.0'
+VERSION = '0.6.1'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -83,7 +83,7 @@ def load_config(path: Path) -> dict:
     cfg = json.loads(path.read_text(encoding='utf-8'))
     base = path.parent
     cfg.setdefault('poll_seconds', 15)  # used only while the push connection is down
-    cfg.setdefault('safety_poll_seconds', 300)  # slow safety net while push is up
+    cfg.setdefault('safety_poll_seconds', 600)  # slow safety net while push is up
     cfg.setdefault('use_push', True)
     cfg.setdefault('parallel_downloads', 10)  # songs downloaded and converted at the same time
     cfg.setdefault('heartbeat_seconds', 30)
@@ -533,7 +533,12 @@ def worker(n: int, cfg: dict, state: State, wake: Wake, stop: threading.Event, o
             if once:
                 return
             # Queue drained: sleep until the server says something is waiting (or the safety check).
-            wake.wait(cfg['safety_poll_seconds'] if state.push_connected else cfg['poll_seconds'], seen)
+            # Only slot 1 keeps a safety check going; the other slots sleep until the server wakes them. That keeps an
+            # idle agent from asking the database ten times over every few minutes.
+            if n == 1:
+                wake.wait(cfg['safety_poll_seconds'] if state.push_connected else cfg['poll_seconds'], seen)
+            else:
+                wake.wait(1800, seen)
             continue
 
         run_job(api, cfg, state, job)
