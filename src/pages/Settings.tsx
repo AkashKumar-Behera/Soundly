@@ -2,6 +2,7 @@ import { Download, LogOut, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DEV_ADMIN, getDevUser, setDevUser } from '../api/client'
+import { Logo } from '../components/Logo'
 import { Segmented } from '../components/Segmented'
 import { useApp } from '../store/app'
 import { usePwa } from '../pwa'
@@ -20,7 +21,7 @@ const DEV_USERS = [
 ]
 
 export function Settings() {
-  const { theme, ui, playerStyle, autoplay, setTheme, setUi, setPlayerStyle, setAutoplay } = useApp()
+  const { theme, ui, playerStyle, autoplay, logo, setTheme, setUi, setPlayerStyle, setAutoplay, setLogo } = useApp()
   const mode = useLibrary((s) => s.mode)
   const me = useLibrary((s) => s.me)
   const demoRole = useLibrary((s) => s.demoRole)
@@ -138,6 +139,21 @@ export function Settings() {
             { value: 'modern', label: 'Modern' },
           ]}
         />
+      </section>
+
+      <section className="setting column">
+        <div>
+          <h3>App logo</h3>
+          <p className="muted">Try the logo designs. This only changes how the logo looks inside the app for now.</p>
+        </div>
+        <div className="logo-picks">
+          {(['bars', 'blend1', 'blend2', 'blend3'] as const).map((v) => (
+            <button key={v} className={`logo-pick ${logo === v ? 'on' : ''}`} onClick={() => setLogo(v)} aria-pressed={logo === v} aria-label={`Logo ${v}`}>
+              <Logo size={64} variant={v} />
+              <span>{v === 'bars' ? 'Original' : v.replace('blend', 'Blend ')}</span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="setting">

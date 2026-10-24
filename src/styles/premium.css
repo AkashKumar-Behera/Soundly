@@ -959,3 +959,26 @@ a,
     backdrop-filter: none;
   }
 }
+
+.logo-picks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.logo-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 6px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.logo-pick.on {
+  border-color: var(--accent);
+  color: var(--text);
+}
