@@ -36,14 +36,17 @@ songs.get('/', async (c) => {
   const offset = clampInt(c.req.query('offset'), 0, 0, 100000)
   const pattern = likePattern(q)
 
+  // No search text: walk the newest-first index and read only the rows asked for (about 100). A search has to look at titles.
   const { results } = await memo(`songs:${user.id}:${q}:${limit}:${offset}`, 30000, () =>
-    c.env.DB.prepare(
-      `${SONG_SELECT}
-     WHERE (?2 = '' OR s.title LIKE ?3 ESCAPE '\\' OR a.name LIKE ?3 ESCAPE '\\' OR s.album LIKE ?3 ESCAPE '\\')
-     ORDER BY s.created_at DESC, s.title LIMIT ?4 OFFSET ?5`,
-    )
-      .bind(user.id, q, pattern, limit, offset)
-      .all<SongRow>(),
+    q === ''
+      ? c.env.DB.prepare(`${SONG_SELECT} ORDER BY s.created_at DESC LIMIT ?2 OFFSET ?3`).bind(user.id, limit, offset).all<SongRow>()
+      : c.env.DB.prepare(
+          `${SONG_SELECT}
+     WHERE (s.title LIKE ?2 ESCAPE '\\' OR a.name LIKE ?2 ESCAPE '\\' OR s.album LIKE ?2 ESCAPE '\\')
+     ORDER BY s.created_at DESC, s.title LIMIT ?3 OFFSET ?4`,
+        )
+          .bind(user.id, pattern, limit, offset)
+          .all<SongRow>(),
   )
 
   return c.json({ songs: results.map(shapeSong), limit, offset })

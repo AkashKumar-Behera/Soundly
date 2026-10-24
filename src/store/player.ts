@@ -133,6 +133,7 @@ function loadSilently(song: Song) {
 
 function setMediaMetadata(song: Song) {
   if (!('mediaSession' in navigator)) return
+  registerMediaHandlers()
   navigator.mediaSession.metadata = new MediaMetadata({
     title: song.title,
     artist: song.artist,
@@ -332,23 +333,32 @@ audio.addEventListener('ended', () => {
   usePlayer.getState().next(true)
 })
 
-if ('mediaSession' in navigator) {
+/**
+ * Lock screen / notification controls. iPhones show +-10 second buttons unless Previous and Next both have handlers
+ * and the seek buttons have none, and they only honour that when it is set up while audio is playing. So this runs
+ * at start-up, whenever a track loads, and again once playback actually begins.
+ */
+function registerMediaHandlers() {
+  if (!('mediaSession' in navigator)) return
   const ms = navigator.mediaSession
-  ms.setActionHandler('play', () => usePlayer.getState().toggle())
-  ms.setActionHandler('pause', () => usePlayer.getState().toggle())
-  ms.setActionHandler('nexttrack', () => usePlayer.getState().next())
-  ms.setActionHandler('previoustrack', () => usePlayer.getState().prev())
-  ms.setActionHandler('seekto', (d) => {
-    if (d.seekTime != null) usePlayer.getState().seek(d.seekTime)
-  })
-  // No handlers for seekbackward/seekforward: with them, iPhones replace Previous/Next with +-10 second buttons.
-  for (const action of ['seekbackward', 'seekforward'] as const) {
+  const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
     try {
-      ms.setActionHandler(action, null)
+      ms.setActionHandler(action, handler)
     } catch {
-      // not supported here
+      // this browser does not know that action
     }
   }
+  set('play', () => usePlayer.getState().toggle())
+  set('pause', () => usePlayer.getState().toggle())
+  set('previoustrack', () => usePlayer.getState().prev())
+  set('nexttrack', () => usePlayer.getState().next())
+  set('seekto', (d) => {
+    if (d.seekTime != null) usePlayer.getState().seek(d.seekTime)
+  })
+  set('seekbackward', null)
+  set('seekforward', null)
 }
+registerMediaHandlers()
+audio.addEventListener('playing', registerMediaHandlers)
 
 export const useCurrent = (): Song | undefined => usePlayer((s) => s.queue[s.index] as Song | undefined)
