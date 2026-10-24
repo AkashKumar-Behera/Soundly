@@ -62,7 +62,7 @@ registerRoute(
 
 // The library (songs, playlists, likes, your profile) so the app opens offline with what you saw last.
 // Admin, auth, YouTube search and the agent are never cached. Only successful responses are kept.
-const SKIP_API = /^\/api\/(admin|auth|agent|youtube|stream|thumb)(\/|$)/
+const SKIP_API = /^\/api\/(admin|auth|agent|youtube|stream|thumb|health|live)(\/|$)/
 registerRoute(
   ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/api/') && !SKIP_API.test(url.pathname),
   new NetworkFirst({

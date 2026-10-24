@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { BackOnline, OfflineScreen } from './components/OfflineScreen'
 import { Maintenance, Splash } from './components/Splash'
+import { useConnection } from './store/connection'
 import { startLive, stopLive } from './lib/live'
 import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
@@ -47,18 +49,24 @@ export default function App() {
   const load = useLibrary((s) => s.load)
   const status = useLibrary((s) => s.status)
   const resumeAt = useLibrary((s) => s.resumeAt)
+  const offline = useConnection((s) => s.offline)
+  const justBack = useConnection((s) => s.justBack)
   const mode = useLibrary((s) => s.mode)
   useEffect(() => {
     void load()
     void useOffline.getState().init()
   }, [load])
   useEffect(() => {
+    if (justBack) void load()
+  }, [justBack, load])
+  useEffect(() => {
     if (status === 'ready' && mode === 'api') startLive()
     else if (status === 'unauth') stopLive()
   }, [status, mode])
   if (status === 'loading') return <Splash />
   if (status === 'maintenance') return <Maintenance resumeAt={resumeAt} onRetry={() => void load()} />
-  if (status === 'offline') return <Splash offline onRetry={() => void load()} />
+  // No connection: only what is on this device. When it comes back, reload the library and show the full app again.
+  if ((offline && status !== 'unauth') || status === 'offline') return <OfflineScreen />
   if (status === 'unauth') {
     return (
       <BrowserRouter>
@@ -71,6 +79,7 @@ export default function App() {
   }
   return (
     <BrowserRouter>
+      <BackOnline />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route element={<Layout />}>
