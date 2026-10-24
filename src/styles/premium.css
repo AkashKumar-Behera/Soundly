@@ -448,3 +448,48 @@ a,
 .community-note {
   margin: -6px 0 10px;
 }
+
+/* Phones: no black band at the top. The search button floats over the page, which now starts right under the status bar. */
+@media (max-width: 860px) {
+  .main {
+    background: var(--bg);
+  }
+  .topbar:not(.on-search) {
+    position: sticky;
+    top: 0;
+    height: 0;
+    padding: 0;
+    overflow: visible;
+    z-index: 30;
+  }
+  .topbar:not(.on-search) .top-search {
+    position: absolute;
+    right: 16px;
+    top: calc(env(safe-area-inset-top) + 8px);
+  }
+  .page {
+    padding-top: calc(env(safe-area-inset-top) + 56px);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--bg)) 0, var(--bg) 380px);
+  }
+  .main:has(.topbar.on-search) .page {
+    padding-top: 0;
+  }
+  .greet,
+  .page-title {
+    padding-right: 52px; /* keeps long titles clear of the search button */
+  }
+  .quick-item {
+    align-items: stretch;
+  }
+  .quick-item > span:not(.fab) {
+    white-space: normal;
+    text-overflow: clip;
+    align-self: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.92rem;
+    hyphens: none;
+  }
+}
