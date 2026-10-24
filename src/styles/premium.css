@@ -887,3 +887,22 @@ a,
   gap: 8px;
   white-space: nowrap;
 }
+
+/* Phones: no box behind the mini player and tab bar (they float), and a touch shorter. */
+@media (max-width: 860px) {
+  .mobile-nav {
+    background: none;
+    padding-top: 0;
+  }
+  .tab {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .mini {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .mobile-nav {
+    padding-bottom: max(6px, calc(env(safe-area-inset-bottom) - 14px));
+  }
+}
