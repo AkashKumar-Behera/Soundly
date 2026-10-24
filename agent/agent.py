@@ -36,7 +36,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.7.1'
+VERSION = '0.8.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -221,6 +221,14 @@ class Api:
         r = self.http.get(f'{self.base}/agent/songs', timeout=30)
         r.raise_for_status()
         return r.json()['songs']
+
+    def genres_todo(self, limit: int = 20) -> list[dict]:
+        r = self.http.get(f'{self.base}/agent/genres/todo', params={'limit': limit}, timeout=30)
+        r.raise_for_status()
+        return r.json()['songs']
+
+    def genres_done(self, results: list[dict]) -> None:
+        self._post('/agent/genres', {'results': results}, timeout=30)
 
     def progress(self, job_id: str, stage: str, progress: float, eta: float | None, speed: float | None) -> None:
         self._post(f'/agent/jobs/{job_id}/progress', {'stage': stage, 'progress': progress, 'etaSec': eta, 'speedBps': speed}, timeout=8)
@@ -508,6 +516,71 @@ class Wake:
             return self.n
 
 
+# ---------------------------------------------------------------- genres (categories)
+
+
+def _key(text: str) -> str:
+    return re.sub(r'[^\w]+', '', re.sub(r'[\(\[][^\)\]]*[\)\]]', '', text or '').lower())
+
+
+def itunes_genre(artist: str, title: str, duration: int | None) -> str | None:
+    """Looks a song up on iTunes (free, no key) and returns its genre, e.g. "Bollywood", "Tamil", "K-Pop", "Hip-Hop/Rap"."""
+    name = clean_title(title)
+    # Titles are often "Artist - Song": search with the song part, and match on it.
+    song = name.split(' - ', 1)[1] if ' - ' in name else name
+    r = requests.get('https://itunes.apple.com/search', params={'term': f'{artist} {song}', 'entity': 'song', 'limit': 8, 'country': 'IN'}, timeout=15)
+    if r.status_code in (403, 429):
+        raise RuntimeError('rate limited')
+    r.raise_for_status()
+    want, who = _key(song), _key(artist)
+    best: tuple[int, str] | None = None
+    for hit in r.json().get('results', []):
+        track, by = _key(hit.get('trackName', '')), _key(hit.get('artistName', ''))
+        if not want or not (want in track or track in want):
+            continue
+        if who and not (who[:6] in by or by[:6] in who):
+            continue
+        gap = abs(round(hit.get('trackTimeMillis', 0) / 1000) - (duration or 0)) if duration else 0
+        if duration and gap > 25:
+            continue
+        genre = hit.get('primaryGenreName')
+        if genre and (best is None or gap < best[0]):
+            best = (gap, genre)
+    return best[1] if best else None
+
+
+def genre_worker(api: Api, stop: threading.Event) -> None:
+    """In the background, finds a genre for every song that does not have one yet. About 20 lookups a minute."""
+    while not stop.is_set():
+        try:
+            todo = api.genres_todo(20)
+        except requests.RequestException:
+            stop.wait(120)
+            continue
+        if not todo:
+            stop.wait(600)  # nothing to do; new songs show up after downloads
+            continue
+        results: list[dict] = []
+        for song in todo:
+            if stop.is_set():
+                break
+            try:
+                results.append({'id': song['id'], 'genre': itunes_genre(song.get('artist') or '', song['title'], song.get('duration'))})
+            except RuntimeError:
+                log.warning('iTunes is rate limiting, pausing genre lookups for 10 minutes')
+                stop.wait(600)
+                break
+            except requests.RequestException:
+                pass  # try this song again next round
+            stop.wait(3.2)
+        if results:
+            try:
+                api.genres_done(results)
+                log.info('genres saved for %d songs', len(results))
+            except requests.RequestException as e:
+                log.warning('could not save genres: %s', e)
+
+
 def run_job(api: Api, cfg: dict, state: State, job: dict) -> None:
     state.start(job['id'])
     try:
@@ -570,6 +643,8 @@ def run(cfg: dict, once: bool) -> None:
     wake = Wake()
     state.on_home = on_home_network(cfg)  # so the first status report is already correct
     threading.Thread(target=heartbeat_loop, args=(api, cfg, state, stop), daemon=True).start()
+    if not once:
+        threading.Thread(target=genre_worker, args=(Api(cfg), stop), daemon=True).start()
     push: Push | None = None
     if cfg['use_push'] and websocket is not None:
         push = Push(cfg, state, wake, stop)

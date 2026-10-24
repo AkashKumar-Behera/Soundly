@@ -495,21 +495,84 @@ a,
 }
 
 /* ---------- iPhone home-screen apps: use the whole screen ---------- */
+/* On iPhones, "fixed" can be measured against a viewport that is shorter than the screen. Pinning the bottom bar and the
+   full-screen panels to the app container instead (which is stretched to the real screen height) avoids that. */
 @media (max-width: 860px) {
   .app {
-    height: calc(100dvh + var(--vgap, 0px));
+    position: relative;
+    height: var(--app-h, 100dvh);
+    overflow: hidden;
+  }
+  .mobile-nav,
+  .np,
+  .modal-back,
+  .menu-back,
+  .menu {
+    position: absolute;
   }
   .mobile-nav {
-    bottom: calc(max(4px, env(safe-area-inset-bottom) - 14px) - var(--vgap, 0px));
+    bottom: max(4px, calc(env(safe-area-inset-bottom) - 14px));
   }
-  .np {
-    bottom: calc(-1 * var(--vgap, 0px));
+}
+
+.cat {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 4px;
+}
+.cat small {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.cat-input {
+  width: 190px;
+}
+.row.dim {
+  opacity: 0.55;
+}
+
+/* ---------- Phones: the page itself never scrolls, only the content inside it; no scrollbars ---------- */
+@media (max-width: 860px) {
+  html {
+    overflow: hidden;
+    height: 100%;
+    overscroll-behavior: none;
   }
-  .modal-back,
-  .menu-back {
-    bottom: calc(-1 * var(--vgap, 0px));
+  /* A fixed body cannot create document scrolling, so even when the app is made taller than iOS's reported viewport
+     (installed iPhone apps), nothing can drag the whole page up or down. */
+  body {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--app-h, 100dvh);
+    overflow: hidden;
   }
-  .menu {
-    bottom: calc(0px - var(--vgap, 0px));
+  #root,
+  .app {
+    height: 100%;
+  }
+  .main {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .main::-webkit-scrollbar,
+  .np::-webkit-scrollbar,
+  .np-panel::-webkit-scrollbar,
+  .shelf-row::-webkit-scrollbar,
+  .chips::-webkit-scrollbar,
+  .md-panel::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  .shelf-row,
+  .chips,
+  .np,
+  .np-panel,
+  .md-panel {
+    scrollbar-width: none;
   }
 }

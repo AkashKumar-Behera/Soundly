@@ -42,6 +42,31 @@ agent.get('/songs', async (c) => {
   return c.json({ songs: results })
 })
 
+// Songs whose genre has not been looked up yet; the agent asks iTunes and reports back.
+agent.get('/genres/todo', async (c) => {
+  const limit = Math.max(1, Math.min(40, Number(c.req.query('limit')) || 20))
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.id, s.title, s.duration_sec AS duration, a.name AS artist
+     FROM songs s LEFT JOIN artists a ON a.id = s.artist_id WHERE s.genre_checked_at IS NULL ORDER BY s.created_at DESC LIMIT ?`,
+  )
+    .bind(limit)
+    .all()
+  return c.json({ songs: results })
+})
+
+agent.post('/genres', async (c) => {
+  const body = await c.req.json<{ results?: { id?: string; genre?: string | null }[] }>().catch(() => ({}) as { results?: { id?: string; genre?: string | null }[] })
+  const rows = (body.results ?? []).slice(0, 60).filter((r) => typeof r.id === 'string')
+  if (!rows.length) return c.json({ ok: true })
+  await c.env.DB.batch(
+    rows.map((r) =>
+      c.env.DB.prepare("UPDATE songs SET genre = ?, genre_checked_at = datetime('now') WHERE id = ?").bind(r.genre ? String(r.genre).slice(0, 80) : null, r.id),
+    ),
+  )
+  forget('categories-raw')
+  return c.json({ ok: true, saved: rows.length })
+})
+
 agent.post('/claim', async (c) => {
   await c.env.DB.prepare(
     "UPDATE download_jobs SET status = 'queued', updated_at = datetime('now') WHERE status IN ('downloading', 'uploading') AND claimed_at < datetime('now', '-30 minutes')",

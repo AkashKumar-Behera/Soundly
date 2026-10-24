@@ -2,6 +2,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { useLibrary, useRole } from '../../store/library'
 import { ActivityTab } from './ActivityTab'
 import { ArtistsTab } from './ArtistsTab'
+import { CategoriesTab } from './CategoriesTab'
 import { InvitesTab } from './InvitesTab'
 import { LyricsTab } from './LyricsTab'
 import { Overview } from './Overview'
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'queue', label: 'Queue' },
   { id: 'songs', label: 'Songs' },
   { id: 'artists', label: 'Artists' },
+  { id: 'categories', label: 'Categories' },
   { id: 'lyrics', label: 'Lyrics' },
   { id: 'users', label: 'Users' },
   { id: 'invites', label: 'Invites' },
@@ -47,6 +49,7 @@ export function Admin() {
       {tab === 'queue' && <QueueTab />}
       {tab === 'songs' && <SongsTab />}
       {tab === 'artists' && <ArtistsTab />}
+      {tab === 'categories' && <CategoriesTab />}
       {tab === 'lyrics' && <LyricsTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'invites' && <InvitesTab />}

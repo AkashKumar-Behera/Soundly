@@ -9,6 +9,7 @@ import { likes, me, plays } from './routes/library'
 import { lyrics } from './routes/lyrics'
 import { radio } from './routes/radio'
 import { live } from './routes/live'
+import { adminCategories, categories } from './routes/categories'
 import { artists } from './routes/artists'
 import { artistPages } from './routes/artist-pages'
 import { playlists } from './routes/playlists'
@@ -67,6 +68,8 @@ app.route('/api/rooms', rooms)
 app.route('/api/lyrics', lyrics)
 app.route('/api/radio', radio)
 app.route('/api/live', live)
+app.route('/api/categories', categories)
+app.route('/api/admin/categories', adminCategories)
 app.route('/api/artists', artistPages)
 app.route('/api/admin/artists', artists)
 app.route('/api/admin', admin)

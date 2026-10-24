@@ -1,10 +1,11 @@
 import { CirclePlay, Clock, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ImportPanel } from '../components/ImportPanel'
 import { YoutubeRow } from '../components/YoutubeRow'
 import { SongRow } from '../components/SongRow'
-import { categories } from '../data/mock'
+import { categories as demoCategories } from '../data/mock'
+import { api } from '../api/client'
 import type { Song } from '../data/mock'
 import { addHistory, clearHistory, removeHistory } from '../lib/searchHistory'
 import { useHistory } from '../lib/useHistory'
@@ -33,6 +34,7 @@ type YtState = { q: string; phase: 'loading' | 'done' | 'error'; results: Youtub
 
 export function Search() {
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const q = (params.get('q') ?? '').trim()
   const playQueue = usePlayer((s) => s.playQueue)
   const role = useRole()
@@ -45,6 +47,34 @@ export function Search() {
   const [results, setResults] = useState<Song[] | null>(null)
   const [yt, setYt] = useState<YtState | null>(null)
   const history = useHistory()
+  const mode = useLibrary((s) => s.mode)
+  // Categories come from the songs' real genres (managed by the admin). Kept 10 minutes on the device.
+  const [cats, setCats] = useState<{ label: string; count: number; hue: number }[] | null>(() => {
+    try {
+      const hit = JSON.parse(localStorage.getItem('soundly.categories') ?? 'null') as { at: number; list: { label: string; count: number; hue: number }[] } | null
+      return hit && Date.now() - hit.at < 10 * 60000 ? hit.list : null
+    } catch {
+      return null
+    }
+  })
+  useEffect(() => {
+    if (mode !== 'api' || cats) return
+    let live = true
+    api<{ categories: { label: string; count: number; hue: number }[] }>('/categories')
+      .then((d) => {
+        if (!live) return
+        setCats(d.categories)
+        try {
+          localStorage.setItem('soundly.categories', JSON.stringify({ at: Date.now(), list: d.categories }))
+        } catch {
+          /* private mode */
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [mode, cats])
 
   // Debounced library search; a stale response never overwrites a newer one.
   useEffect(() => {
@@ -140,9 +170,15 @@ export function Search() {
         )}
         <h2 className="section-title">Browse all</h2>
         <div className="cats">
-          {categories.map((c) => (
-            <button key={c.id} className="cat" style={{ background: `linear-gradient(135deg, hsl(${c.hue} 70% 42%), hsl(${c.hue + 40} 70% 28%))` }} onClick={() => setParams({ q: c.title })}>
-              {c.title}
+          {(mode === 'api' ? (cats ?? []) : demoCategories.map((c) => ({ label: c.title, count: 0, hue: c.hue }))).map((c) => (
+            <button
+              key={c.label}
+              className="cat"
+              style={{ background: `linear-gradient(135deg, hsl(${c.hue} 70% 42%), hsl(${c.hue + 40} 70% 28%))` }}
+              onClick={() => (mode === 'api' ? navigate(`/category/${encodeURIComponent(c.label)}`) : setParams({ q: c.label }))}
+            >
+              {c.label}
+              {c.count > 0 && <small>{c.count} songs</small>}
             </button>
           ))}
         </div>

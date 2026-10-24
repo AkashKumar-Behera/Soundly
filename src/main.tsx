@@ -6,18 +6,22 @@ import { setupPwa } from './pwa'
 
 setupPwa()
 
-// iPhone home-screen apps: the page is drawn full screen (under the status bar) but iOS reports a layout viewport that is
-// shorter by the status bar's height, which left an empty strip at the bottom. Measure that gap and let the layout use it.
-function syncViewportGap() {
+// iPhone home-screen apps: right after launch iOS can report a layout viewport that is shorter than the screen (by the
+// status bar), which left an empty strip at the bottom until the app was minimised and reopened. In an installed app the
+// page is always the full screen, so size the app container to the screen itself instead of trusting the viewport.
+function syncAppHeight() {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
-  const gap = screen.height - window.innerHeight
   const portrait = window.innerHeight > window.innerWidth
-  document.documentElement.style.setProperty('--vgap', standalone && portrait && gap >= 20 && gap <= 90 ? `${gap}px` : '0px')
+  const fullWidth = Math.abs(screen.width - window.innerWidth) <= 1
+  const root = document.documentElement.style
+  if (standalone && portrait && fullWidth) root.setProperty('--app-h', `${screen.height}px`)
+  else root.removeProperty('--app-h')
 }
-syncViewportGap()
-window.addEventListener('resize', syncViewportGap)
-window.addEventListener('orientationchange', () => setTimeout(syncViewportGap, 300))
-document.addEventListener('visibilitychange', syncViewportGap)
+syncAppHeight()
+window.addEventListener('resize', syncAppHeight)
+window.addEventListener('pageshow', syncAppHeight)
+window.addEventListener('orientationchange', () => setTimeout(syncAppHeight, 300))
+document.addEventListener('visibilitychange', syncAppHeight)
 
 // Feels like an app: no browser context menu, copy or drag outside text fields. Song rows open their own menu.
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest('input, textarea, [contenteditable="true"]')
