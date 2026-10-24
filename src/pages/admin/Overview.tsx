@@ -19,7 +19,7 @@ interface Analytics {
 
 export function Overview({ goTo }: { goTo: (tab: string) => void }) {
   const [days, setDays] = useState(30)
-  const stats = useAdminData<Stats>('/admin/stats', 10000)
+  const stats = useAdminData<Stats>('/admin/stats', ['requests', 'agent', 'library'])
   const analytics = useAdminData<Analytics>(`/admin/analytics?days=${days}`)
   const s = stats.data
   const a = analytics.data

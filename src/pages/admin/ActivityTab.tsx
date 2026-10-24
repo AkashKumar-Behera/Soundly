@@ -39,7 +39,7 @@ function summary(e: Entry): string {
 }
 
 export function ActivityTab() {
-  const { data } = useAdminData<{ entries: Entry[] }>('/admin/audit?limit=100', 15000)
+  const { data } = useAdminData<{ entries: Entry[] }>('/admin/audit?limit=100')
   return (
     <div className="rows">
       {data?.entries.map((e) => (

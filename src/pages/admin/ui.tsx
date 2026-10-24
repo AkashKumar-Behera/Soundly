@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../../api/client'
+import { useLiveReload } from '../../lib/live'
+import type { Topic } from '../../lib/live'
 
 export function formatBytes(n: number): string {
   if (!n) return '0 B'
@@ -23,7 +25,7 @@ export function timeAgo(sql: string | null | undefined): string {
 }
 
 /** Loads an admin endpoint and exposes `reload`; a stale response never overwrites a newer one. */
-export function useAdminData<T>(path: string, pollMs = 0) {
+export function useAdminData<T>(path: string, watch: Topic[] = []) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,14 +48,14 @@ export function useAdminData<T>(path: string, pollMs = 0) {
         }
       })
       .catch((e) => live && setError((e as { code?: string }).code ?? 'error'))
-    const timer = pollMs ? setInterval(() => !document.hidden && void reload(), Math.max(pollMs * 2.5, 4000)) : undefined
     return () => {
       live = false
-      if (timer) clearInterval(timer)
     }
-  }, [path, pollMs, reload])
+  }, [path])
 
-  return { data, error, reload }
+  useLiveReload(watch, () => void reload())
+
+  return { data, error, reload, setData }
 }
 
 export function Stat({ label, value, sub, progress, tone }: { label: string; value: ReactNode; sub?: ReactNode; progress?: number; tone?: 'ok' | 'warn' | 'bad' }) {

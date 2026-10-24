@@ -33,7 +33,7 @@ const inOneYear = () => new Date(Date.now() + 365 * 86400000).toISOString().slic
 export function UsersTab() {
   const showToast = useUi((s) => s.showToast)
   const meId = useLibrary((s) => s.me?.id)
-  const { data, reload } = useAdminData<{ users: AdminUser[] }>('/admin/users')
+  const { data, reload } = useAdminData<{ users: AdminUser[] }>('/admin/users', ['users'])
   const [busy, setBusy] = useState<string | null>(null)
 
   const patch = async (u: AdminUser, body: Record<string, unknown>) => {

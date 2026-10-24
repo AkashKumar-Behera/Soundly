@@ -70,6 +70,10 @@ const devQuery = () => {
   const dev = getDevUser()
   return dev ? `?devUser=${encodeURIComponent(dev)}` : ''
 }
+export function liveUrl(): string {
+  const base = API_BASE.startsWith('http') ? API_BASE : `${window.location.origin}${API_BASE}`
+  return `${base.replace(/^http/, 'ws')}/live${devQuery()}`
+}
 export const streamUrl = (id: string) => `${API_BASE}/stream/${id}${devQuery()}`
 export const thumbUrl = (id: string) => `${API_BASE}/thumb/${id}${devQuery()}`
 

@@ -3,6 +3,7 @@ import { requireUser } from '../auth'
 import { createJob } from '../lib/jobs'
 import { queueInfo } from '../lib/queue'
 import type { QueueInfo } from '../lib/queue'
+import { emit, liveProgress } from '../lib/live'
 import { wakeAgent } from '../lib/wake'
 import type { AppEnv } from '../types'
 
@@ -39,7 +40,7 @@ export interface JobRow {
   speed_bps?: number | null
 }
 
-export const shapeJob = (j: JobRow, q?: QueueInfo) => ({
+export const shapeJob = (j: JobRow, q?: QueueInfo, live?: Record<string, { stage: string; progress: number; etaSec: number | null; speedBps: number | null }>) => ({
   id: j.id,
   userId: j.user_id,
   userName: j.userName,
@@ -55,10 +56,10 @@ export const shapeJob = (j: JobRow, q?: QueueInfo) => ({
   songId: j.song_id,
   createdAt: j.created_at,
   // Live progress while the agent works on it, and where a waiting job stands in the queue.
-  stage: j.stage ?? null,
-  progress: j.progress ?? null,
-  etaSec: j.eta_sec ?? null,
-  speedBps: j.speed_bps ?? null,
+  stage: live?.[j.id]?.stage ?? j.stage ?? null,
+  progress: live?.[j.id]?.progress ?? j.progress ?? null,
+  etaSec: live?.[j.id]?.etaSec ?? j.eta_sec ?? null,
+  speedBps: live?.[j.id]?.speedBps ?? j.speed_bps ?? null,
   ahead: q && j.status === 'queued' ? (q.ahead.get(j.id) ?? 0) : null,
   waitSec: q && j.status === 'queued' ? ((q.ahead.get(j.id) ?? 0) + 1) * q.avgSec : null,
 })
@@ -79,6 +80,7 @@ requests.post('/', async (c) => {
   })
   if (r.ok) {
     if (r.status === 'queued') wakeAgent(c.env, c.executionCtx)
+    emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
     return c.json({ id: r.id, status: r.status, flags: r.flags }, 201)
   }
 
@@ -92,6 +94,6 @@ requests.get('/', async (c) => {
   )
     .bind(c.get('user').id)
     .all<JobRow>()
-  const q = await queueInfo(c.env.DB)
-  return c.json({ requests: results.map((j) => shapeJob(j, q)) })
+  const [q, live] = await Promise.all([queueInfo(c.env.DB), liveProgress(c.env)])
+  return c.json({ requests: results.map((j) => shapeJob(j, q, live)) })
 })

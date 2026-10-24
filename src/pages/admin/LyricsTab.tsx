@@ -15,7 +15,7 @@ interface Submission {
 /** Lyrics that trusted users pasted. Approving makes them the lyrics everyone sees. */
 export function LyricsTab() {
   const showToast = useUi((s) => s.showToast)
-  const { data, reload } = useAdminData<{ submissions: Submission[] }>('/lyrics/submissions/pending', 8000)
+  const { data, reload } = useAdminData<{ submissions: Submission[] }>('/lyrics/submissions/pending', ['lyrics'])
   const rows = data?.submissions ?? []
 
   const decide = async (id: string, decision: 'approve' | 'reject') => {

@@ -36,7 +36,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.6.1'
+VERSION = '0.7.0'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -158,10 +158,13 @@ class ProgressFile:
         self._fh.close()
 
 
+PUSH: 'Push | None' = None  # the live WebSocket, once started: progress is streamed over it
+
+
 class Reporter:
     """Sends live progress of one job to the server, at most every 1.5 s (always on a stage change)."""
 
-    MIN_GAP = 1.5
+    MIN_GAP = 2.0
 
     def __init__(self, api: 'Api', job_id: str):
         self.api, self.job_id = api, job_id
@@ -173,8 +176,12 @@ class Reporter:
         if not force and stage == self.stage and now - self.last < self.MIN_GAP:
             return
         self.stage, self.last = stage, now
+        overall = max(0.0, min(1.0, overall))
+        # Over the WebSocket the server just forwards it to the apps (no database, no extra request). HTTP is the fallback.
+        if PUSH is not None and PUSH.send_json({'type': 'progress', 'jobId': self.job_id, 'stage': stage, 'progress': overall, 'etaSec': eta, 'speedBps': speed}):
+            return
         try:
-            self.api.progress(self.job_id, stage, max(0.0, min(1.0, overall)), eta, speed)
+            self.api.progress(self.job_id, stage, overall, eta, speed)
         except requests.RequestException:
             pass  # progress is cosmetic; never let it fail a download
 
@@ -405,6 +412,16 @@ class Push(threading.Thread):
         self.cfg, self.state, self.wake, self.stop = cfg, state, wake, stop
         self.app = None
 
+    def send_json(self, payload: dict) -> bool:
+        app = self.app
+        if app is None or not self.state.push_connected:
+            return False
+        try:
+            app.send(json.dumps(payload))
+            return True
+        except Exception:  # noqa: BLE001 - the connection just dropped; the caller falls back to HTTP
+            return False
+
     def status_message(self, kind: str) -> str:
         return json.dumps({'type': kind, 'agentId': self.cfg['agent_id'], 'version': VERSION, 'onHomeWifi': self.state.on_home, 'jobId': self.state.job_id})
 
@@ -557,6 +574,8 @@ def run(cfg: dict, once: bool) -> None:
     if cfg['use_push'] and websocket is not None:
         push = Push(cfg, state, wake, stop)
         push.start()
+        global PUSH
+        PUSH = push
     elif cfg['use_push']:
         log.warning('websocket-client is not installed (pip install websocket-client); polling instead')
     slots = 1 if once else max(1, min(int(cfg['parallel_downloads']), 16))

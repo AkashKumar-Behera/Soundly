@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { onLive } from '../lib/live'
 import { api, ApiError, setDemo, streamUrl, thumbUrl } from '../api/client'
 import { clearDeviceData } from '../lib/deviceCache'
 import { playlists as mockPlaylists, songById as mockSongById, songs as mockSongs } from '../data/mock'
@@ -178,6 +179,7 @@ interface LibraryState {
   removeFromPlaylist: (playlistId: string, songId: string) => Promise<boolean>
   createRequest: (input: RequestInput) => Promise<RequestResult>
   loadRequests: () => Promise<void>
+  refreshSongs: () => Promise<void>
   decideRequest: (id: string, decision: 'approve' | 'reject') => Promise<void>
   setDemoRole: (role: Role) => void
 }
@@ -409,6 +411,16 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     }
   },
 
+  refreshSongs: async () => {
+    if (get().mode === 'demo') return
+    try {
+      const d = await api<{ songs: ApiSong[] }>('/songs?limit=100')
+      set({ songs: d.songs.map(toSong) })
+    } catch {
+      // keep what we have
+    }
+  },
+
   loadRequests: async () => {
     if (get().mode === 'demo') return
     const admin = get().me?.role === 'admin'
@@ -437,3 +449,26 @@ export const useLibrary = create<LibraryState>((set, get) => ({
 export const useRole = (): Role => useLibrary((s) => (s.mode === 'api' && s.me ? s.me.role : s.demoRole))
 export const useCanRequestDirect = (): boolean =>
   useLibrary((s) => (s.mode === 'api' && s.me ? s.me.canRequestDirect : s.demoRole === 'trusted' || s.demoRole === 'admin'))
+
+// Pushed from the server: progress and status changes patch the lists on screen directly (no refetching), and a
+// finished download refreshes the song list once.
+let songsTimer: ReturnType<typeof setTimeout> | undefined
+onLive((e) => {
+  const { requests } = useLibrary.getState()
+  if (e.type === 'progress') {
+    if (!requests.some((r) => r.id === e.jobId)) return
+    useLibrary.setState({
+      requests: requests.map((r) => (r.id === e.jobId ? { ...r, status: r.status === 'queued' ? 'downloading' : r.status, stage: e.stage, progress: e.progress, etaSec: e.etaSec, speedBps: e.speedBps } : r)),
+    })
+  } else if (e.type === 'job') {
+    if (requests.some((r) => r.id === e.id)) {
+      useLibrary.setState({
+        requests: requests.map((r) => (r.id === e.id ? { ...r, status: e.status as RequestStatus, ...(e.status === 'done' ? { stage: null, progress: 1, etaSec: null, speedBps: null } : {}) } : r)),
+      })
+    }
+  }
+  if ((e.type === 'job' && e.status === 'done') || (e.type === 'hint' && e.topic === 'library')) {
+    clearTimeout(songsTimer)
+    songsTimer = setTimeout(() => !document.hidden && void useLibrary.getState().refreshSongs(), 8000)
+  }
+})

@@ -32,7 +32,7 @@ interface ArtistRequest {
 /** Artists that members asked for; approving queues the whole catalogue. */
 function ArtistRequests() {
   const showToast = useUi((s) => s.showToast)
-  const { data, reload } = useAdminData<{ requests: ArtistRequest[] }>('/admin/artists/requests', 8000)
+  const { data, reload } = useAdminData<{ requests: ArtistRequest[] }>('/admin/artists/requests', ['artists'])
   const rows = data?.requests ?? []
   if (!rows.length) return null
 

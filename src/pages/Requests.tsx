@@ -1,6 +1,7 @@
 import { Check, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { RequestProgress, YtThumb } from '../components/RequestProgress'
+import { useLiveReload } from '../lib/live'
 import { useLibrary, useRole } from '../store/library'
 import type { RequestStatus } from '../store/library'
 
@@ -23,14 +24,11 @@ export function Requests() {
   const decide = useLibrary((s) => s.decideRequest)
   const role = useRole()
 
-  // Refresh quickly while something is downloading (live progress), slowly otherwise.
-  const busy = requests.some((r) => r.status === 'downloading' || r.status === 'uploading')
+  // Loaded once; after that the server pushes every change and download progress (no polling).
   useEffect(() => {
     void loadRequests()
-    if (mode !== 'api') return
-    const t = setInterval(() => !document.hidden && void loadRequests(), busy ? 4000 : 20000)
-    return () => clearInterval(t)
-  }, [loadRequests, mode, busy])
+  }, [loadRequests])
+  useLiveReload(['requests'], () => mode === 'api' && void loadRequests())
 
   return (
     <>

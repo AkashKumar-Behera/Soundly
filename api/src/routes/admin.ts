@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
 import type { AppEnv } from '../types'
+import { emit, liveProgress } from '../lib/live'
 import { queueInfo } from '../lib/queue'
 import { agentStatus, wakeAgent } from '../lib/wake'
 import { audit, forget, getSetting, memo } from '../util'
@@ -18,8 +19,8 @@ admin.get('/requests', async (c) => {
     ? c.env.DB.prepare(`${base} WHERE j.status = ? ORDER BY j.created_at DESC LIMIT 200`).bind(status)
     : c.env.DB.prepare(`${base} ORDER BY j.created_at DESC LIMIT 200`)
   const { results } = await stmt.all<JobRow>()
-  const q = await queueInfo(c.env.DB)
-  return c.json({ requests: results.map((j) => shapeJob(j, q)) })
+  const [q, live] = await Promise.all([queueInfo(c.env.DB), liveProgress(c.env)])
+  return c.json({ requests: results.map((j) => shapeJob(j, q, live)) })
 })
 
 admin.post('/requests/:id/approve', async (c) => {
@@ -32,6 +33,7 @@ admin.post('/requests/:id/approve', async (c) => {
   if (!res.meta.changes) return c.json({ error: 'not_pending' }, 409)
   await audit(c.env.DB, c.get('user').id, 'request.approve', id)
   wakeAgent(c.env, c.executionCtx)
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
   return c.json({ status: 'queued' })
 })
 
@@ -47,6 +49,7 @@ admin.post('/requests/:id/reject', async (c) => {
   if (!res.meta.changes) return c.json({ error: 'not_rejectable' }, 409)
   await c.env.DB.prepare('DELETE FROM import_items WHERE youtube_id = (SELECT youtube_id FROM download_jobs WHERE id = ?)').bind(id).run()
   await audit(c.env.DB, c.get('user').id, 'request.reject', id, { reason })
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
   return c.json({ status: 'rejected' })
 })
 
@@ -79,6 +82,7 @@ admin.post('/requests/:id/retry', async (c) => {
   if (!res.meta.changes) return c.json({ error: 'not_failed' }, 409)
   await audit(c.env.DB, c.get('user').id, 'request.retry', id)
   wakeAgent(c.env, c.executionCtx)
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
   return c.json({ status: 'queued' })
 })
 
@@ -87,7 +91,7 @@ admin.get('/stats', async (c) => {
   const db = c.env.DB
   const [users, songs, jobs, plays, agent, maxUsers, window, hub] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS n FROM users WHERE disabled = 0').first<{ n: number }>(),
-    db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM songs').first<{ n: number; bytes: number }>(),
+    memo('stats-songs', 60000, () => db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM songs').first<{ n: number; bytes: number }>()),
     memo('job-counts', 30000, () => db.prepare('SELECT status, COUNT(*) AS n FROM download_jobs GROUP BY status').all<{ status: string; n: number }>()),
     db.prepare("SELECT COUNT(*) AS n FROM plays WHERE played_at >= date('now', '-7 days')").first<{ n: number }>(),
     db.prepare('SELECT * FROM agent_heartbeats ORDER BY last_seen_at DESC LIMIT 1').first<{
@@ -139,6 +143,7 @@ const ROLES = ['listener', 'member', 'trusted', 'admin']
 
 admin.patch('/users/:id', async (c) => {
   forget('users-list')
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'users' })
   const id = c.req.param('id')
   const body = await c.req
     .json<{ role?: string; canRequestDirect?: boolean; dailyRequestLimit?: number; proUntil?: string | null; disabled?: boolean; contributionNote?: string }>()

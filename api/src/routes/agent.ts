@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { requireAgent } from '../auth'
+import { emit } from '../lib/live'
+import { forget } from '../util'
 import { wakeAgent } from '../lib/wake'
 import type { Env } from '../types'
 
@@ -53,6 +55,8 @@ agent.post('/claim', async (c) => {
      RETURNING id, youtube_id AS youtubeId, youtube_url AS url, title, channel, duration_sec AS durationSec`,
   ).first()
 
+  const claimed = job as { id?: string } | null
+  if (claimed?.id) emit(c.env, c.executionCtx, { type: 'job', id: claimed.id, status: 'downloading' })
   return c.json({ job: job ?? null })
 })
 
@@ -72,11 +76,8 @@ agent.post('/jobs/:id/progress', async (c) => {
   const progress = Math.max(0, Math.min(1, Number(b.progress) || 0))
   const eta = Number.isFinite(b.etaSec) ? Math.max(0, Math.round(b.etaSec as number)) : null
   const speed = Number.isFinite(b.speedBps) ? Math.max(0, Math.round(b.speedBps as number)) : null
-  await c.env.DB.prepare(
-    "UPDATE download_jobs SET stage = ?, progress = ?, eta_sec = ?, speed_bps = ?, progress_at = datetime('now') WHERE id = ? AND status IN ('downloading', 'uploading')",
-  )
-    .bind(stage, progress, eta, speed, c.req.param('id'))
-    .run()
+  // Older agents report over HTTP. Progress is only ever pushed to the apps, never written to the database.
+  emit(c.env, c.executionCtx, { type: 'progress', jobId: c.req.param('id'), stage: stage as string, progress, etaSec: eta, speedBps: speed })
   return c.json({ ok: true })
 })
 
@@ -84,6 +85,7 @@ agent.post('/jobs/:id/uploading', async (c) => {
   await c.env.DB.prepare("UPDATE download_jobs SET status = 'uploading', updated_at = datetime('now') WHERE id = ? AND status = 'downloading'")
     .bind(c.req.param('id'))
     .run()
+  emit(c.env, c.executionCtx, { type: 'job', id: c.req.param('id'), status: 'uploading' })
   return c.json({ ok: true })
 })
 
@@ -142,6 +144,11 @@ agent.post('/jobs/:id/complete', async (c) => {
     db.prepare('DELETE FROM import_items WHERE youtube_id = ?').bind(job.youtube_id),
   ])
 
+  forget('songs:')
+  forget('stats-songs')
+  forget('artists')
+  emit(c.env, c.executionCtx, { type: 'job', id, status: 'done', songId })
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'library' })
   return c.json({ songId })
 })
 
@@ -159,5 +166,6 @@ agent.post('/jobs/:id/fail', async (c) => {
     .bind((body.error ?? 'unknown error').slice(0, 300), body.fatal ? 1 : 0, c.req.param('id'))
     .run()
   wakeAgent(c.env, c.executionCtx) // a requeued job is claimable again
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
   return c.json({ ok: true })
 })

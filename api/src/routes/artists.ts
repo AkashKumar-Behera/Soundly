@@ -4,6 +4,7 @@ import { createJob } from '../lib/jobs'
 import { wakeAgent } from '../lib/wake'
 import { ytmArtists, ytmArtistSongs } from '../lib/ytm'
 import type { AppEnv } from '../types'
+import { emit } from '../lib/live'
 import { queueArtist } from './artist-pages'
 import { annotate } from './youtube'
 
@@ -47,6 +48,7 @@ artists.post('/requests/:id/:decision', async (c) => {
     }
   }
   await c.env.DB.prepare('UPDATE artist_requests SET status = ? WHERE id = ?').bind(decision === 'approve' ? 'approved' : 'rejected', c.req.param('id')).run()
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'artists' })
   return c.json(result)
 })
 

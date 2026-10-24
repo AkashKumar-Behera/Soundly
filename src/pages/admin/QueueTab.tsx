@@ -2,6 +2,7 @@ import { Check, RotateCcw, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import { RequestProgress, YtThumb } from '../../components/RequestProgress'
+import { useLive } from '../../lib/live'
 import { useUi } from '../../store/ui'
 import { timeAgo, useAdminData } from './ui'
 
@@ -49,13 +50,17 @@ const FLAG: Record<string, string> = { not_music: 'Not music?', too_long: 'Very 
 export function QueueTab() {
   const showToast = useUi((s) => s.showToast)
   const [filter, setFilter] = useState('pending_approval')
-  // "Working" covers both downloading and uploading, so fetch everything and filter here.
-  // Poll faster while a download is running so its bar moves.
-  const [fast, setFast] = useState(false)
-  const { data, reload } = useAdminData<{ requests: Job[] }>('/admin/requests', fast ? 1500 : 5000)
+  // "Working" covers both downloading and uploading, so fetch everything and filter here. Changes and progress
+  // are pushed by the server, so the list never polls.
+  const { data, reload, setData } = useAdminData<{ requests: Job[] }>('/admin/requests', ['requests'])
   const all = data?.requests ?? []
-  const running = all.some((j) => j.status === 'downloading' || j.status === 'uploading')
-  if (running !== fast) setFast(running)
+  useLive((e) => {
+    if (e.type === 'progress') {
+      setData((d) => (d && d.requests.some((j) => j.id === e.jobId) ? { requests: d.requests.map((j) => (j.id === e.jobId ? { ...j, status: j.status === 'queued' ? 'downloading' : j.status, stage: e.stage, progress: e.progress, etaSec: e.etaSec, speedBps: e.speedBps } : j)) } : d))
+    } else if (e.type === 'job') {
+      setData((d) => (d && d.requests.some((j) => j.id === e.id) ? { requests: d.requests.map((j) => (j.id === e.id ? { ...j, status: e.status } : j)) } : d))
+    }
+  })
   const rows = all.filter((j) => (filter === '' ? true : filter === 'downloading' ? ['downloading', 'uploading'].includes(j.status) : j.status === filter))
   const count = (id: string) => all.filter((j) => (id === '' ? true : id === 'downloading' ? ['downloading', 'uploading'].includes(j.status) : j.status === id)).length
   const cleanPending = all.filter((j) => j.status === 'pending_approval' && !j.flags.length)

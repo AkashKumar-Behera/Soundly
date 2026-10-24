@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { canRequestDirect, requireUser } from '../auth'
 import { autoAddable } from '../lib/autofilter'
 import { createJob } from '../lib/jobs'
+import { emit } from '../lib/live'
+import { forget, memo } from '../util'
 import { wakeAgent } from '../lib/wake'
 import { ytmArtists, ytmArtistSongs } from '../lib/ytm'
 import type { AppEnv, Env, User } from '../types'
@@ -24,20 +26,23 @@ export async function queueArtist(env: Env, ctx: { waitUntil(promise: Promise<un
     if (r.ok) queued += 1
     else skipped += 1
   }
-  if (queued) wakeAgent(env, ctx)
+  if (queued) {
+    wakeAgent(env, ctx)
+    emit(env, ctx, { type: 'hint', topic: 'requests' })
+  }
   return { queued, skipped }
 }
 
 /** Artists in the library with their photo. Photos are looked up from YouTube Music a few at a time and then kept. */
 artistPages.get('/', async (c) => {
   const db = c.env.DB
-  const { results } = await db
+  const { results } = await memo('artists', 120000, () => db
     .prepare(
       `SELECT a.id, a.name, a.browse_id AS browseId, a.image_url AS imageUrl, a.image_checked_at AS checked, COUNT(s.id) AS songCount
        FROM artists a JOIN songs s ON s.artist_id = a.id
        GROUP BY a.id ORDER BY songCount DESC, a.name`,
     )
-    .all<{ id: string; name: string; browseId: string | null; imageUrl: string | null; checked: string | null; songCount: number }>()
+    .all<{ id: string; name: string; browseId: string | null; imageUrl: string | null; checked: string | null; songCount: number }>())
 
   const todo = results.filter((a) => !a.checked && a.name !== 'Unknown Artist').slice(0, 8)
   await Promise.all(
@@ -47,6 +52,7 @@ artistPages.get('/', async (c) => {
         a.browseId = hit?.browseId ?? null
         a.imageUrl = hit?.thumbnail ?? null
         await db.prepare("UPDATE artists SET browse_id = ?, image_url = ?, image_checked_at = datetime('now') WHERE id = ?").bind(a.browseId, a.imageUrl, a.id).run()
+        forget('artists')
       } catch (e) {
         console.error('artist lookup failed', e) // try again on the next visit
       }
@@ -102,5 +108,6 @@ artistPages.post('/request', async (c) => {
   } catch {
     return c.json({ error: 'already_requested' }, 409)
   }
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'artists' })
   return c.json({ status: 'pending' })
 })

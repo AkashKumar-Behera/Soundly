@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
+import { emit } from '../lib/live'
 import type { AppEnv } from '../types'
 
 export const lyrics = new Hono<AppEnv>()
@@ -128,6 +129,7 @@ lyrics.post('/submissions/:id/:decision', requireAdmin, async (c) => {
   if (!sub) return c.json({ error: 'not_found' }, 404)
   if (decision === 'approve') await publish(c.env.DB, sub.songId, sub.text)
   await c.env.DB.prepare('UPDATE lyrics_submissions SET status = ? WHERE id = ?').bind(decision === 'approve' ? 'approved' : 'rejected', c.req.param('id')).run()
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'lyrics' })
   return c.json({ ok: true })
 })
 
@@ -150,6 +152,7 @@ lyrics.put('/:songId/mine', async (c) => {
     .bind(crypto.randomUUID(), id, user.id, text, approved ? 'approved' : 'pending')
     .run()
   if (approved) await publish(c.env.DB, id, text)
+  else emit(c.env, c.executionCtx, { type: 'hint', topic: 'lyrics' })
   return c.json(shapeText(text, { mine: true, pending: !approved }))
 })
 

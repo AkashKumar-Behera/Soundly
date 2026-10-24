@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { requireUser } from '../auth'
 import type { AppEnv } from '../types'
-import { clampInt, likePattern, parseRange } from '../util'
+import { clampInt, likePattern, memo, parseRange } from '../util'
 
 export const songs = new Hono<AppEnv>()
 songs.use('*', requireUser)
@@ -32,13 +32,15 @@ songs.get('/', async (c) => {
   const offset = clampInt(c.req.query('offset'), 0, 0, 100000)
   const pattern = likePattern(q)
 
-  const { results } = await c.env.DB.prepare(
-    `${SONG_SELECT}
+  const { results } = await memo(`songs:${user.id}:${q}:${limit}:${offset}`, 30000, () =>
+    c.env.DB.prepare(
+      `${SONG_SELECT}
      WHERE (?2 = '' OR s.title LIKE ?3 ESCAPE '\\' OR a.name LIKE ?3 ESCAPE '\\' OR s.album LIKE ?3 ESCAPE '\\')
      ORDER BY s.created_at DESC, s.title LIMIT ?4 OFFSET ?5`,
+    )
+      .bind(user.id, q, pattern, limit, offset)
+      .all<SongRow>(),
   )
-    .bind(user.id, q, pattern, limit, offset)
-    .all<SongRow>()
 
   return c.json({ songs: results.map(shapeSong), limit, offset })
 })

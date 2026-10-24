@@ -8,6 +8,7 @@ import { rooms } from './routes/rooms'
 import { likes, me, plays } from './routes/library'
 import { lyrics } from './routes/lyrics'
 import { radio } from './routes/radio'
+import { live } from './routes/live'
 import { artists } from './routes/artists'
 import { artistPages } from './routes/artist-pages'
 import { playlists } from './routes/playlists'
@@ -34,6 +35,23 @@ app.use(
 
 app.get('/api/health', (c) => c.json({ ok: true, service: 'soundly-api' }))
 
+// A runaway loop (a bug, a stuck tab) must never be able to burn the database's daily allowance: cap each caller.
+const hits = new Map<string, { n: number; at: number }>()
+app.use('/api/*', async (c, next) => {
+  const path = new URL(c.req.url).pathname
+  if (/^\/api\/(stream|thumb|agent|live|auth)/.test(path)) return next()
+  const key = `${c.req.header('CF-Connecting-IP') ?? 'local'}|${c.req.header('Cookie')?.slice(-40) ?? c.req.header('X-Dev-User') ?? ''}`
+  const now = Date.now()
+  const rec = hits.get(key)
+  if (!rec || now - rec.at > 60000) {
+    hits.set(key, { n: 1, at: now })
+    if (hits.size > 5000) for (const [k, v] of hits) if (now - v.at > 60000) hits.delete(k)
+  } else if (++rec.n > 240) {
+    return c.json({ error: 'slow_down' }, 429)
+  }
+  return next()
+})
+
 app.route('/api/auth', auth)
 app.route('/api/me', me)
 app.route('/api/songs', songs)
@@ -48,6 +66,7 @@ app.route('/api/wrapped', wrapped)
 app.route('/api/rooms', rooms)
 app.route('/api/lyrics', lyrics)
 app.route('/api/radio', radio)
+app.route('/api/live', live)
 app.route('/api/artists', artistPages)
 app.route('/api/admin/artists', artists)
 app.route('/api/admin', admin)
