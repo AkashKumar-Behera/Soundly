@@ -215,7 +215,7 @@ function ScreenInfo() {
     probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:env(safe-area-inset-bottom);visibility:hidden'
     document.body.appendChild(probe)
     const read = () =>
-      setInfo(`${window.innerWidth}×${window.innerHeight} in a ${screen.width}×${screen.height} screen · bottom inset ${probe.offsetHeight}px · ${window.matchMedia('(display-mode: standalone)').matches ? 'installed app' : 'browser'}`)
+      setInfo(`${window.innerWidth}×${window.innerHeight} in a ${screen.width}×${screen.height} screen · bottom inset ${probe.offsetHeight}px · app height ${getComputedStyle(document.documentElement).getPropertyValue('--app-h') || 'auto'} · ${window.matchMedia('(display-mode: standalone)').matches ? 'installed app' : 'browser'}`)
     read()
     window.addEventListener('resize', read)
     return () => {

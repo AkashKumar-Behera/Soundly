@@ -576,3 +576,20 @@ a,
     scrollbar-width: none;
   }
 }
+
+/* ---------- Phones: no dark gap when the page is pulled past its top or bottom ---------- */
+@media (max-width: 860px) {
+  .main {
+    overscroll-behavior: none;
+    /* The scroll container's own background is what shows while rubber-banding. Give it the same colours as the page,
+       top and bottom, so pulling never reveals a black band. */
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--bg)) 0, var(--bg) 380px, var(--bg) 100%);
+    background-repeat: no-repeat;
+  }
+  .page {
+    background: none;
+  }
+  .main:has(.topbar.on-search) {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--bg)) 0, var(--bg) 320px);
+  }
+}
