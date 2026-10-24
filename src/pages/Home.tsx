@@ -84,6 +84,9 @@ export function Home() {
 
   return (
     <>
+      <button className="home-avatar" aria-label="Open settings" onClick={() => navigate('/settings')}>
+        {(useLibrary.getState().me?.name ?? 'A').slice(0, 1).toUpperCase()}
+      </button>
       <h1 className="greet">{greeting()}</h1>
 
       {mode === 'api' && (

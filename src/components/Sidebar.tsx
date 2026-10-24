@@ -23,6 +23,7 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
+      <div className="sb-top">
       <div className="brand">
         <Logo size={34} />
         <span>Soundly</span>
@@ -36,7 +37,9 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      </div>
 
+      <div className="sb-lib">
       <div className="lib-head">
         <NavLink to="/library" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Library size={22} />
@@ -66,6 +69,8 @@ export function Sidebar() {
             </div>
           </NavLink>
         ))}
+      </div>
+
       </div>
 
       <div className="sb-foot">
