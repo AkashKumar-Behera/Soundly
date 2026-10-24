@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
+import { audit } from '../util'
 import type { AppEnv } from '../types'
 import { forget, memo } from '../util'
 import { SONG_SELECT, shapeSong } from './songs'
@@ -102,6 +103,41 @@ adminCategories.delete('/', async (c) => {
   await c.env.DB.prepare('DELETE FROM categories WHERE genre = ?').bind(genre).run()
   forget('categories-raw')
   return c.json({ moved: moved.meta.changes })
+})
+
+// Delete a category together with every song in it (audio and covers included). Anyone can request a song again later.
+adminCategories.delete('/by-label', async (c) => {
+  const label = (c.req.query('label') ?? '').slice(0, 40)
+  if (!label) return c.json({ error: 'invalid_request' }, 400)
+  const db = c.env.DB
+  forget('categories-raw')
+  const genres = (await loadGenres(db)).filter((g) => g.label === label)
+  if (!genres.length) return c.json({ deleted: 0, freedBytes: 0 })
+
+  const named = genres.filter((g) => g.genre !== null).map((g) => g.genre as string)
+  const withNull = genres.some((g) => g.genre === null)
+  const marks = named.map((_, i) => `?${i + 1}`).join(',')
+  const where = [named.length ? `genre IN (${marks})` : '', withNull ? 'genre IS NULL' : ''].filter(Boolean).join(' OR ')
+  const { results } = await db.prepare(`SELECT id, r2_key, thumb_key, size_bytes FROM songs WHERE ${where}`).bind(...named).all<{ id: string; r2_key: string; thumb_key: string | null; size_bytes: number | null }>()
+
+  const keys = results.flatMap((s) => [s.r2_key, ...(s.thumb_key ? [s.thumb_key] : [])])
+  for (let i = 0; i < keys.length; i += 500) await c.env.SONGS.delete(keys.slice(i, i + 500))
+  for (let i = 0; i < results.length; i += 40) {
+    const ids = results.slice(i, i + 40).map((s) => s.id)
+    const m = ids.map(() => '?').join(',')
+    await db.batch([
+      db.prepare(`UPDATE download_jobs SET song_id = NULL WHERE song_id IN (${m})`).bind(...ids),
+      db.prepare(`DELETE FROM songs WHERE id IN (${m})`).bind(...ids),
+    ])
+  }
+  for (const g of genres) await db.prepare('DELETE FROM categories WHERE genre = ?').bind(g.genre ?? OTHER).run()
+  const freed = results.reduce((n, s) => n + (s.size_bytes ?? 0), 0)
+  await audit(db, c.get('user').id, 'category.delete', label, { songs: results.length, bytes: freed })
+  forget('categories-raw')
+  forget('songs:')
+  forget('stats-songs')
+  forget('artists')
+  return c.json({ deleted: results.length, freedBytes: freed })
 })
 
 // Look every song up again (e.g. after the lookup got better).

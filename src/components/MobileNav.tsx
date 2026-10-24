@@ -1,4 +1,5 @@
 import { House, Inbox, Library, Pause, Play, Search, Settings } from 'lucide-react'
+import { useLayoutEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useCurrent, usePlayer } from '../store/player'
 import { useUi } from '../store/ui'
@@ -17,9 +18,21 @@ export function MobileNav() {
   const playing = usePlayer((s) => s.playing)
   const toggle = usePlayer((s) => s.toggle)
   const setNowPlaying = useUi((s) => s.setNowPlaying)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // The page ends where the player and tab bar begin (like a native tab bar), so content never shows behind or under them.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const set = () => document.documentElement.style.setProperty('--nav-h', `${el.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
-    <div className="mobile-nav">
+    <div className="mobile-nav" ref={ref}>
       {song && (
         <div className="mini" onClick={() => setNowPlaying(true)}>
           <Cover hue={song.hue} hue2={song.hue2} thumbUrl={song.thumbUrl} size={40} className="r8" />

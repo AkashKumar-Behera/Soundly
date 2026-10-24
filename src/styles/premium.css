@@ -906,3 +906,56 @@ a,
     padding-bottom: max(6px, calc(env(safe-area-inset-bottom) - 14px));
   }
 }
+
+.cat-wrap {
+  position: relative;
+}
+.cat-wrap .cat {
+  width: 100%;
+  height: 100%;
+}
+.cat-manage {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  color: #fff;
+}
+.cat-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.btn-pill.danger {
+  background: #e5484d;
+  color: #fff;
+}
+
+/* Phones: the scrolling page stops above the player and tab bar; nothing is drawn behind or beneath them. */
+@media (max-width: 860px) {
+  .app {
+    background: var(--bg);
+  }
+  .main {
+    margin-bottom: var(--nav-h, 0px);
+    padding-bottom: 24px;
+    height: auto;
+  }
+  .mobile-nav {
+    background: none;
+  }
+  .mini,
+  .tabs {
+    background: var(--panel-2);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

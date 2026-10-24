@@ -1,4 +1,4 @@
-import { CirclePlay, Clock, X } from 'lucide-react'
+import { CirclePlay, Clock, Settings2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ImportPanel } from '../components/ImportPanel'
@@ -6,6 +6,7 @@ import { YoutubeRow } from '../components/YoutubeRow'
 import { SongRow } from '../components/SongRow'
 import { categories as demoCategories } from '../data/mock'
 import { api } from '../api/client'
+import { CategoryManager } from '../components/CategoryManager'
 import type { Song } from '../data/mock'
 import { addHistory, clearHistory, removeHistory } from '../lib/searchHistory'
 import { useHistory } from '../lib/useHistory'
@@ -48,6 +49,7 @@ export function Search() {
   const [yt, setYt] = useState<YtState | null>(null)
   const history = useHistory()
   const mode = useLibrary((s) => s.mode)
+  const [managing, setManaging] = useState<string | null>(null)
   // Categories come from the songs' real genres (managed by the admin). Kept 10 minutes on the device.
   const [cats, setCats] = useState<{ label: string; count: number; hue: number }[] | null>(() => {
     try {
@@ -169,17 +171,37 @@ export function Search() {
           </>
         )}
         <h2 className="section-title">Browse all</h2>
+        {managing && (
+          <CategoryManager
+            label={managing}
+            onClose={() => setManaging(null)}
+            onChanged={() => {
+              try {
+                localStorage.removeItem('soundly.categories')
+              } catch {
+                /* private mode */
+              }
+              setCats(null)
+            }}
+          />
+        )}
         <div className="cats">
           {(mode === 'api' ? (cats ?? []) : demoCategories.map((c) => ({ label: c.title, count: 0, hue: c.hue }))).map((c) => (
-            <button
-              key={c.label}
-              className="cat"
-              style={{ background: `linear-gradient(135deg, hsl(${c.hue} 70% 42%), hsl(${c.hue + 40} 70% 28%))` }}
-              onClick={() => (mode === 'api' ? navigate(`/category/${encodeURIComponent(c.label)}`) : setParams({ q: c.label }))}
-            >
-              {c.label}
-              {c.count > 0 && <small>{c.count} songs</small>}
-            </button>
+            <div key={c.label} className="cat-wrap">
+              <button
+                className="cat"
+                style={{ background: `linear-gradient(135deg, hsl(${c.hue} 70% 42%), hsl(${c.hue + 40} 70% 28%))` }}
+                onClick={() => (mode === 'api' ? navigate(`/category/${encodeURIComponent(c.label)}`) : setParams({ q: c.label }))}
+              >
+                {c.label}
+                {c.count > 0 && <small>{c.count} songs</small>}
+              </button>
+              {mode === 'api' && role === 'admin' && (
+                <button className="cat-manage" aria-label={`Manage ${c.label}`} onClick={() => setManaging(c.label)}>
+                  <Settings2 size={16} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </>
