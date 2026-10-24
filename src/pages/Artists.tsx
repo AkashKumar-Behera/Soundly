@@ -127,7 +127,7 @@ export function Artists() {
       {artists && !artists.length && <p className="muted empty">No artists yet.</p>}
       <div className="artist-grid">
         {artists?.map((a) => (
-          <div key={a.id} className="artist-card" role="link" tabIndex={0} onClick={() => navigate(`/search?q=${encodeURIComponent(a.name)}`)} onKeyDown={(e) => e.key === 'Enter' && navigate(`/search?q=${encodeURIComponent(a.name)}`)}>
+          <div key={a.id} className="artist-card" role="link" tabIndex={0} onClick={() => navigate(`/artist/${encodeURIComponent(a.name)}`)} onKeyDown={(e) => e.key === 'Enter' && navigate(`/artist/${encodeURIComponent(a.name)}`)}>
             <Avatar name={a.name} url={a.imageUrl} id={a.id} size={150} />
             <div className="truncate strong">{a.name}</div>
             <div className="muted">{a.songCount} song{a.songCount === 1 ? '' : 's'}</div>

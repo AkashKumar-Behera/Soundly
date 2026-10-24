@@ -1,4 +1,4 @@
-import { ArrowDownToLine, Check, Heart, ListEnd, ListPlus, ListStart, Mic2, Radio, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, Check, Heart, ListEnd, ListPlus, ListStart, Mic2, Radio, Trash2, UserRound, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
@@ -28,6 +28,7 @@ function SongMenu() {
   const setLyrics = useUi((s) => s.setLyricsEditor)
   const showToast = useUi((s) => s.showToast)
   const role = useRole()
+  const navigate = useNavigate()
   const mode = useLibrary((s) => s.mode)
   const liked = useLibrary((s) => (menu ? s.liked.includes(menu.song.id) : false))
   const toggleLike = useLibrary((s) => s.toggleLike)
@@ -93,6 +94,11 @@ function SongMenu() {
             onClick={done(() => void removeFromPlaylist(menu.playlistId!, song.id).then((ok) => showToast(ok ? 'Removed from playlist' : 'Could not remove')))}
           >
             Remove from this playlist
+          </Item>
+        )}
+        {mode === 'api' && song.artist && song.artist !== 'Unknown Artist' && (
+          <Item icon={<UserRound size={18} />} onClick={done(() => navigate(`/artist/${encodeURIComponent(song.artist)}`))}>
+            View artist
           </Item>
         )}
         {mode === 'api' && (

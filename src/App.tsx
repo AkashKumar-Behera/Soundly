@@ -5,6 +5,7 @@ import { Maintenance, Splash } from './components/Splash'
 import { startLive, stopLive } from './lib/live'
 import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
+import { ArtistPage } from './pages/ArtistPage'
 import { Artists } from './pages/Artists'
 import { Library } from './pages/Library'
 import { Login } from './pages/Login'
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="search" element={<Search />} />
           <Route path="library" element={<Library />} />
           <Route path="artists" element={<Artists />} />
+          <Route path="artist/:name" element={<ArtistPage />} />
           <Route path="playlist/:id" element={<Playlist />} />
           <Route path="requests" element={<Requests />} />
           <Route path="settings" element={<Settings />} />
