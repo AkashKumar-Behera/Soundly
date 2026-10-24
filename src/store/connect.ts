@@ -22,6 +22,8 @@ export interface Device {
   state: DeviceState | null
   /** Not connected right now (the app is in the background or closed). */
   away?: boolean
+  /** When it was last connected (ms since 1970). */
+  seen?: number
 }
 
 const ID_KEY = 'soundly.device-id'

@@ -114,15 +114,15 @@ export class AgentHub extends DurableObject<Env> {
 
   /** One entry per device: connected ones with what they play, plus ones that are away right now. */
   private async devicesOf(userTag: string, except?: WebSocket) {
-    const live = new Map<string, { id: string; name: string; kind: string; state: unknown; away: boolean }>()
+    const live = new Map<string, { id: string; name: string; kind: string; state: unknown; away: boolean; seen: number }>()
     for (const s of this.ctx.getWebSockets(userTag)) {
       if (s === except) continue
       const a = s.deserializeAttachment() as { id?: string; name?: string; kind?: string; state?: unknown } | null
-      if (a?.id) live.set(a.id, { id: a.id, name: a.name ?? 'Device', kind: a.kind ?? 'web', state: a.state ?? null, away: false })
+      if (a?.id) live.set(a.id, { id: a.id, name: a.name ?? 'Device', kind: a.kind ?? 'web', state: a.state ?? null, away: false, seen: Date.now() })
     }
     const known = await this.known(userTag)
     for (const [id, k] of Object.entries(known)) {
-      if (!live.has(id)) live.set(id, { id, name: k.name, kind: k.kind, state: null, away: true })
+      if (!live.has(id)) live.set(id, { id, name: k.name, kind: k.kind, state: null, away: true, seen: k.seen })
     }
     return [...live.values()]
   }
@@ -258,7 +258,11 @@ export class AgentHub extends DurableObject<Env> {
     const tags = this.ctx.getTags(ws)
     if (tags.includes('agent')) this.emit({ type: 'hint', topic: 'agent' })
     const userTag = tags.find((t) => t.startsWith('u:'))
-    if (userTag) await this.tellDevices(userTag, ws)
+    if (userTag) {
+      const gone = ws.deserializeAttachment() as { id?: string; name?: string; kind?: string } | null
+      if (gone?.id) await this.remember(userTag, gone.id, gone.name ?? 'Device', gone.kind ?? 'web')
+      await this.tellDevices(userTag, ws)
+    }
   }
 
   private async status(): Promise<HubStatus> {

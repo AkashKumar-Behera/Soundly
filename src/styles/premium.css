@@ -1386,3 +1386,40 @@ a,
 .dev-row.away {
   opacity: 0.6;
 }
+.dev-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.dev-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7280;
+}
+.dev-status .dot.on {
+  background: #22c55e;
+}
+.dev-prog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.dev-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.15);
+  overflow: hidden;
+}
+.dev-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+}

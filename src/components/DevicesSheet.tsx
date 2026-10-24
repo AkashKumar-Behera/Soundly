@@ -1,5 +1,6 @@
 import { Laptop, Pause, Pencil, Play, SkipBack, SkipForward, Smartphone, Tablet, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { formatTime } from '../lib/format'
 import { useConnect } from '../store/connect'
 import type { Device } from '../store/connect'
 import { useCurrent, usePlayer } from '../store/player'
@@ -7,19 +8,43 @@ import { useUi } from '../store/ui'
 
 const icon = (kind: string) => (kind === 'computer' ? <Laptop size={22} /> : kind === 'tablet' ? <Tablet size={22} /> : <Smartphone size={22} />)
 
-function Row({ d }: { d: Device }) {
+function ago(ms?: number): string {
+  if (!ms) return ''
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000))
+  if (s < 90) return 'a minute ago'
+  if (s < 3600) return `${Math.round(s / 60)} min ago`
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`
+  return `${Math.round(s / 86400)} d ago`
+}
+
+function Row({ d, now }: { d: Device; now: number }) {
   const playOn = useConnect((s) => s.playOn)
   const playHere = useConnect((s) => s.playHere)
   const control = useConnect((s) => s.control)
   const st = d.state
   // A state older than a minute while "playing" means that device went away without saying so.
-  const live = !!st && (!st.playing || Date.now() - st.at < 60000)
+  const live = !!st && (!st.playing || now - st.at < 60000)
+  // What the other device reports is a few seconds old, so keep counting from there while it plays.
+  const pos = st ? Math.min(st.duration || 0, st.position + (st.playing && live ? Math.max(0, (now - st.at) / 1000) : 0)) : 0
   return (
     <div className={`dev-row ${live && st?.playing ? 'on' : ''} ${d.away ? 'away' : ''}`}>
       <div className="dev-ico">{icon(d.kind)}</div>
       <div className="min0 grow">
         <div className="truncate strong">{d.name}</div>
-        <div className="truncate muted">{d.away ? 'Away. Plays when you open the app there' : st && live ? `${st.playing ? 'Playing' : 'Paused'} · ${st.title}` : 'Ready'}</div>
+        <div className="dev-status">
+          <i className={`dot ${d.away ? '' : 'on'}`} />
+          <span>{d.away ? `Offline · ${ago(d.seen)}` : 'Online'}</span>
+        </div>
+        <div className="truncate muted">{d.away ? 'Plays when you open the app there' : st && live ? `${st.playing ? 'Playing' : 'Paused'} · ${st.title}` : 'Ready'}</div>
+        {st && live && !d.away && st.duration > 0 && (
+          <div className="dev-prog">
+            <span>{formatTime(pos)}</span>
+            <div className="dev-bar">
+              <div style={{ width: `${Math.min(100, (pos / st.duration) * 100)}%` }} />
+            </div>
+            <span>{formatTime(st.duration)}</span>
+          </div>
+        )}
       </div>
       {st && live && st.playing ? (
         <div className="dev-ctrl">
@@ -62,6 +87,13 @@ export function DevicesSheet() {
   const current = useCurrent()
   const playing = usePlayer((s) => s.playing)
   const [editing, setEditing] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!open) return
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [open])
   if (!open) return null
 
   return (
@@ -102,7 +134,7 @@ export function DevicesSheet() {
         {devices.length === 0 ? (
           <p className="muted empty">No other devices yet. Open Soundly on your phone, tablet or laptop with the same account and it shows up here.</p>
         ) : (
-          devices.map((d) => <Row key={d.id} d={d} />)
+          devices.map((d) => <Row key={d.id} d={d} now={now} />)
         )}
       </div>
     </div>
