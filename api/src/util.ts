@@ -47,3 +47,18 @@ export function parseRange(header: string | null, size: number): { start: number
   if (start >= size || start > end) return 'invalid'
   return { start, end }
 }
+
+const memoStore = new Map<string, { at: number; value: unknown }>()
+
+/** Remembers an expensive result for `ttlMs` (per Worker instance). Saves D1 row reads on hot, slow-changing numbers. */
+export async function memo<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+  const hit = memoStore.get(key)
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value as T
+  const value = await load()
+  memoStore.set(key, { at: Date.now(), value })
+  return value
+}
+
+export function forget(prefix: string): void {
+  for (const k of memoStore.keys()) if (k.startsWith(prefix)) memoStore.delete(k)
+}

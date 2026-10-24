@@ -3,7 +3,7 @@ import { requireAdmin, requireUser } from '../auth'
 import type { AppEnv } from '../types'
 import { queueInfo } from '../lib/queue'
 import { agentStatus, wakeAgent } from '../lib/wake'
-import { audit, getSetting } from '../util'
+import { audit, forget, getSetting, memo } from '../util'
 import { shapeJob } from './requests'
 import type { JobRow } from './requests'
 
@@ -88,7 +88,7 @@ admin.get('/stats', async (c) => {
   const [users, songs, jobs, plays, agent, maxUsers, window, hub] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS n FROM users WHERE disabled = 0').first<{ n: number }>(),
     db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM songs').first<{ n: number; bytes: number }>(),
-    db.prepare('SELECT status, COUNT(*) AS n FROM download_jobs GROUP BY status').all<{ status: string; n: number }>(),
+    memo('job-counts', 30000, () => db.prepare('SELECT status, COUNT(*) AS n FROM download_jobs GROUP BY status').all<{ status: string; n: number }>()),
     db.prepare("SELECT COUNT(*) AS n FROM plays WHERE played_at >= date('now', '-7 days')").first<{ n: number }>(),
     db.prepare('SELECT * FROM agent_heartbeats ORDER BY last_seen_at DESC LIMIT 1').first<{
       agent_id: string
@@ -121,7 +121,8 @@ admin.get('/stats', async (c) => {
 
 // ---------- Users ----------
 admin.get('/users', async (c) => {
-  const { results } = await c.env.DB.prepare(
+  // Per-user play and storage totals scan big tables, so keep them for a minute (a role change clears it).
+  const results = await memo('users-list', 60000, async () => (await c.env.DB.prepare(
     `SELECT u.id, u.email, u.name, u.avatar_url AS avatarUrl, u.role, u.can_request_direct AS canRequestDirect, u.daily_request_limit AS dailyRequestLimit,
             u.pro_until AS proUntil, u.contribution_note AS contributionNote, u.disabled, u.created_at AS createdAt, u.last_seen_at AS lastSeenAt,
             (SELECT COUNT(*) FROM download_jobs j WHERE j.user_id = u.id) AS requestCount,
@@ -130,13 +131,14 @@ admin.get('/users', async (c) => {
             (SELECT COUNT(*) FROM songs s WHERE s.added_by = u.id) AS songsAdded,
             (SELECT COALESCE(SUM(s.size_bytes), 0) FROM songs s WHERE s.added_by = u.id) AS storageBytes
      FROM users u ORDER BY u.created_at`,
-  ).all()
+  ).all()).results)
   return c.json({ users: results })
 })
 
 const ROLES = ['listener', 'member', 'trusted', 'admin']
 
 admin.patch('/users/:id', async (c) => {
+  forget('users-list')
   const id = c.req.param('id')
   const body = await c.req
     .json<{ role?: string; canRequestDirect?: boolean; dailyRequestLimit?: number; proUntil?: string | null; disabled?: boolean; contributionNote?: string }>()
