@@ -272,3 +272,155 @@
     box-shadow: inset 0 0 0 1px var(--glass-line);
   }
 }
+
+/* ============================================================
+   Native feel: system font on Apple devices, text that scales with the screen,
+   no grey tap flashes, no rubber-banding of the page itself.
+   ============================================================ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+  }
+}
+body {
+  touch-action: manipulation;
+}
+.main {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+button,
+a,
+[role='button'],
+[role='link'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 860px) {
+  /* One scale for the whole app: 15px on small phones, up to 17.5px on big ones and tablets */
+  html {
+    font-size: clamp(15px, 3.7vw + 1px, 17.5px);
+  }
+  body {
+    font-size: 1rem;
+  }
+  .page-title,
+  .greet {
+    font-size: clamp(26px, 8vw, 38px);
+    letter-spacing: -0.03em;
+  }
+  .shelf-head h2,
+  .section-title {
+    font-size: clamp(18px, 5.4vw, 24px);
+  }
+  .card-title,
+  .song-title,
+  .quick-item {
+    font-size: 1rem;
+  }
+  .card-sub,
+  .song-artist,
+  .muted {
+    font-size: 0.875rem;
+  }
+  .tab {
+    font-size: clamp(10px, 2.8vw, 12px);
+  }
+
+  /* No giant search field on every screen: a small button, and the real field only on Search */
+  .topbar {
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-bottom: 6px;
+    min-height: 0;
+    background: transparent;
+    justify-content: flex-end;
+    pointer-events: none;
+  }
+  .topbar > * {
+    pointer-events: auto;
+  }
+  .top-search {
+    display: grid;
+    margin-left: auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--glass);
+    border: 1px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+  .topbar .search-wrap {
+    display: none;
+  }
+  .topbar.on-search {
+    background: linear-gradient(180deg, var(--panel) 60%, transparent);
+    pointer-events: auto;
+  }
+  .topbar.on-search .search-wrap {
+    display: block;
+    flex: 1;
+    max-width: none;
+  }
+  .topbar.on-search .top-search {
+    display: none;
+  }
+  .page {
+    padding-top: 0;
+  }
+  .page > :first-child {
+    margin-top: 0;
+  }
+
+  /* Settings: grouped cards instead of a long list of lines */
+  .setting {
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border: 1px solid var(--glass-line);
+    border-radius: 18px;
+    background: var(--panel-2);
+    gap: 10px;
+  }
+  .setting + .setting {
+    border-top: 1px solid var(--glass-line);
+  }
+  .setting h3 {
+    font-size: 1rem;
+  }
+  .setting p {
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+  .segmented {
+    width: 100%;
+  }
+  .segmented button {
+    flex: 1;
+    padding: 9px 6px;
+  }
+  .screen-info {
+    margin: 4px 4px 16px;
+    font-size: 0.75rem;
+    opacity: 0.7;
+  }
+}
+@media (min-width: 861px) {
+  .top-search {
+    display: none;
+  }
+}
+
+/* A bit less empty space at the bottom of the phone */
+@media (max-width: 860px) {
+  .mobile-nav {
+    bottom: max(4px, calc(env(safe-area-inset-bottom) - 14px));
+  }
+  .main {
+    padding-bottom: calc(138px + env(safe-area-inset-bottom) * 0.3);
+  }
+}

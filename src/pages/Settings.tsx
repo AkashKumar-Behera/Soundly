@@ -155,6 +155,8 @@ export function Settings() {
         />
       </section>
 
+      <ScreenInfo />
+
       {mode === 'api' && me?.role === 'admin' && (
         <section className="setting">
           <div>
@@ -205,3 +207,22 @@ export function Settings() {
     </>
   )
 }
+
+function ScreenInfo() {
+  const [info, setInfo] = useState('')
+  useEffect(() => {
+    const probe = document.createElement('div')
+    probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:env(safe-area-inset-bottom);visibility:hidden'
+    document.body.appendChild(probe)
+    const read = () =>
+      setInfo(`${window.innerWidth}×${window.innerHeight} in a ${screen.width}×${screen.height} screen · bottom inset ${probe.offsetHeight}px · ${window.matchMedia('(display-mode: standalone)').matches ? 'installed app' : 'browser'}`)
+    read()
+    window.addEventListener('resize', read)
+    return () => {
+      window.removeEventListener('resize', read)
+      probe.remove()
+    }
+  }, [])
+  return <p className="muted screen-info">{info}</p>
+}
+

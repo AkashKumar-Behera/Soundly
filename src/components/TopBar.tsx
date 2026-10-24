@@ -58,7 +58,7 @@ export function TopBar() {
     : history.slice(0, 6).map((q) => ({ q, past: true }))
 
   return (
-    <header className="topbar">
+    <header className={`topbar ${onSearch ? 'on-search' : ''}`}>
       <div className="nav-arrows">
         <button className="icon-btn dark" aria-label="Back" onClick={() => navigate(-1)}>
           <ChevronLeft size={22} />
@@ -67,6 +67,9 @@ export function TopBar() {
           <ChevronRight size={22} />
         </button>
       </div>
+      <button className="top-search icon-btn dark" aria-label="Search" onClick={() => navigate('/search')}>
+        <Search size={22} />
+      </button>
       <div className="search-wrap">
         <label className="search">
           <Search size={20} />
