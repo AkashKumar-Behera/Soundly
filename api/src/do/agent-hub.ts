@@ -99,19 +99,36 @@ export class AgentHub extends DurableObject<Env> {
     }
   }
 
-  /** The devices of one signed-in user, read from what each connection stored about itself. */
-  private devicesOf(userTag: string, except?: WebSocket) {
-    const out: { id: string; name: string; kind: string; state: unknown }[] = []
+  /** Devices that connected before but are not connected right now (a phone with the app in the background). */
+  private async known(userTag: string): Promise<Record<string, { name: string; kind: string; seen: number }>> {
+    return (await this.ctx.storage.get<Record<string, { name: string; kind: string; seen: number }>>(`dev:${userTag}`)) ?? {}
+  }
+
+  private async remember(userTag: string, id: string, name: string, kind: string): Promise<void> {
+    const all = await this.known(userTag)
+    const week = Date.now() - 7 * 86400000
+    for (const k of Object.keys(all)) if (all[k].seen < week) delete all[k]
+    all[id] = { name, kind, seen: Date.now() }
+    await this.ctx.storage.put(`dev:${userTag}`, all)
+  }
+
+  /** One entry per device: connected ones with what they play, plus ones that are away right now. */
+  private async devicesOf(userTag: string, except?: WebSocket) {
+    const live = new Map<string, { id: string; name: string; kind: string; state: unknown; away: boolean }>()
     for (const s of this.ctx.getWebSockets(userTag)) {
       if (s === except) continue
       const a = s.deserializeAttachment() as { id?: string; name?: string; kind?: string; state?: unknown } | null
-      if (a?.id) out.push({ id: a.id, name: a.name ?? 'Device', kind: a.kind ?? 'web', state: a.state ?? null })
+      if (a?.id) live.set(a.id, { id: a.id, name: a.name ?? 'Device', kind: a.kind ?? 'web', state: a.state ?? null, away: false })
     }
-    return out
+    const known = await this.known(userTag)
+    for (const [id, k] of Object.entries(known)) {
+      if (!live.has(id)) live.set(id, { id, name: k.name, kind: k.kind, state: null, away: true })
+    }
+    return [...live.values()]
   }
 
-  private tellDevices(userTag: string, except?: WebSocket): void {
-    const text = JSON.stringify({ type: 'devices', devices: this.devicesOf(userTag, except) })
+  private async tellDevices(userTag: string, except?: WebSocket): Promise<void> {
+    const text = JSON.stringify({ type: 'devices', devices: await this.devicesOf(userTag, except) })
     for (const s of this.ctx.getWebSockets(userTag)) {
       if (s === except) continue
       try {
@@ -123,7 +140,7 @@ export class AgentHub extends DurableObject<Env> {
   }
 
   /** Messages from an app: it introduces itself, shares what it is playing, and sends commands to its other devices. */
-  private handleClient(ws: WebSocket, userTag: string, message: string): void {
+  private async handleClient(ws: WebSocket, userTag: string, message: string): Promise<void> {
     let msg: { type?: string; id?: string; name?: string; kind?: string; state?: unknown; to?: string; cmd?: string; payload?: unknown }
     try {
       msg = JSON.parse(message)
@@ -133,37 +150,56 @@ export class AgentHub extends DurableObject<Env> {
     const mine = (ws.deserializeAttachment() as { id?: string; name?: string; kind?: string; state?: unknown } | null) ?? {}
 
     if (msg.type === 'hello' && typeof msg.id === 'string') {
-      // A reload or reconnect of the same device replaces its older connection.
+      const id = msg.id.slice(0, 40)
+      // A reload or reconnect of the same device replaces its older connection (and drops its listing right away).
       for (const s of this.ctx.getWebSockets(userTag)) {
-        if (s !== ws && (s.deserializeAttachment() as { id?: string } | null)?.id === msg.id) s.close(1000, 'replaced')
+        if (s !== ws && (s.deserializeAttachment() as { id?: string } | null)?.id === id) {
+          s.serializeAttachment({})
+          s.close(1000, 'replaced')
+        }
       }
-      ws.serializeAttachment({ id: msg.id.slice(0, 40), name: String(msg.name ?? 'Device').slice(0, 40), kind: String(msg.kind ?? 'web').slice(0, 12), state: null })
-      this.tellDevices(userTag)
+      const name = String(msg.name ?? 'Device').slice(0, 40)
+      const kind = String(msg.kind ?? 'web').slice(0, 12)
+      ws.serializeAttachment({ id, name, kind, state: null })
+      await this.remember(userTag, id, name, kind)
+      await this.tellDevices(userTag)
+      // Something was sent to this device while it was away: hand it over now (if it is still fresh).
+      const pend = await this.ctx.storage.get<{ text: string; at: number }>(`pend:${userTag}:${id}`)
+      if (pend) {
+        await this.ctx.storage.delete(`pend:${userTag}:${id}`)
+        if (Date.now() - pend.at < 5 * 60000) ws.send(pend.text)
+      }
       return
     }
     if (!mine.id) return
 
     if (msg.type === 'state') {
       ws.serializeAttachment({ ...mine, state: msg.state ?? null })
-      this.tellDevices(userTag)
+      await this.tellDevices(userTag)
       return
     }
     if (msg.type === 'rename' && typeof msg.name === 'string') {
-      ws.serializeAttachment({ ...mine, name: msg.name.slice(0, 40) })
-      this.tellDevices(userTag)
+      const name = msg.name.slice(0, 40)
+      ws.serializeAttachment({ ...mine, name })
+      await this.remember(userTag, mine.id, name, mine.kind ?? 'web')
+      await this.tellDevices(userTag)
       return
     }
     if (msg.type === 'cmd' && typeof msg.to === 'string' && typeof msg.cmd === 'string') {
       const text = JSON.stringify({ type: 'cmd', from: mine.id, fromName: mine.name, cmd: msg.cmd.slice(0, 20), payload: msg.payload ?? null })
+      let delivered = false
       for (const s of this.ctx.getWebSockets(userTag)) {
         if ((s.deserializeAttachment() as { id?: string } | null)?.id === msg.to) {
           try {
             s.send(text)
+            delivered = true
           } catch {
             // closing
           }
         }
       }
+      // The device is away (app in the background): keep a "play" for it, delivered when the app opens again.
+      if (!delivered && msg.cmd === 'play') await this.ctx.storage.put(`pend:${userTag}:${msg.to}`, { text, at: Date.now() })
     }
   }
 
@@ -171,7 +207,7 @@ export class AgentHub extends DurableObject<Env> {
     if (typeof message !== 'string') return
     const tags = this.ctx.getTags(ws)
     const userTag = tags.find((t) => t.startsWith('u:'))
-    if (userTag && tags.includes('client')) return this.handleClient(ws, userTag, message)
+    if (userTag && tags.includes('client')) return await this.handleClient(ws, userTag, message)
     // Other apps only listen. Only the agent talks back.
     if (!tags.includes('agent')) return
 
@@ -222,7 +258,7 @@ export class AgentHub extends DurableObject<Env> {
     const tags = this.ctx.getTags(ws)
     if (tags.includes('agent')) this.emit({ type: 'hint', topic: 'agent' })
     const userTag = tags.find((t) => t.startsWith('u:'))
-    if (userTag) this.tellDevices(userTag, ws)
+    if (userTag) await this.tellDevices(userTag, ws)
   }
 
   private async status(): Promise<HubStatus> {

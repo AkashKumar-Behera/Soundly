@@ -15,11 +15,11 @@ function Row({ d }: { d: Device }) {
   // A state older than a minute while "playing" means that device went away without saying so.
   const live = !!st && (!st.playing || Date.now() - st.at < 60000)
   return (
-    <div className={`dev-row ${live && st?.playing ? 'on' : ''}`}>
+    <div className={`dev-row ${live && st?.playing ? 'on' : ''} ${d.away ? 'away' : ''}`}>
       <div className="dev-ico">{icon(d.kind)}</div>
       <div className="min0 grow">
         <div className="truncate strong">{d.name}</div>
-        <div className="truncate muted">{st && live ? `${st.playing ? 'Playing' : 'Paused'} · ${st.title}` : 'Ready'}</div>
+        <div className="truncate muted">{d.away ? 'Away. Plays when you open the app there' : st && live ? `${st.playing ? 'Playing' : 'Paused'} · ${st.title}` : 'Ready'}</div>
       </div>
       {st && live && st.playing ? (
         <div className="dev-ctrl">

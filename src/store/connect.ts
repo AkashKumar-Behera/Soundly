@@ -20,6 +20,8 @@ export interface Device {
   name: string
   kind: string
   state: DeviceState | null
+  /** Not connected right now (the app is in the background or closed). */
+  away?: boolean
 }
 
 const ID_KEY = 'soundly.device-id'
@@ -49,7 +51,8 @@ function guessKind(): string {
 function guessName(): string {
   const ua = navigator.userAgent
   const base = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? (/Mobile/.test(ua) ? 'Android phone' : 'Android tablet') : /Windows/.test(ua) ? 'Windows PC' : /Mac/.test(ua) ? 'Mac' : 'This device'
-  return base
+  const installed = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
+  return `${base} ${installed ? '(app)' : '(browser)'}`
 }
 
 interface ConnectState {

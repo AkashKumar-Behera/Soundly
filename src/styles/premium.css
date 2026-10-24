@@ -1383,3 +1383,6 @@ a,
     font-size: 0.65rem;
   }
 }
+.dev-row.away {
+  opacity: 0.6;
+}
