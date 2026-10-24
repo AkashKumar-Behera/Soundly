@@ -493,3 +493,23 @@ a,
     hyphens: none;
   }
 }
+
+/* ---------- iPhone home-screen apps: use the whole screen ---------- */
+@media (max-width: 860px) {
+  .app {
+    height: calc(100dvh + var(--vgap, 0px));
+  }
+  .mobile-nav {
+    bottom: calc(max(4px, env(safe-area-inset-bottom) - 14px) - var(--vgap, 0px));
+  }
+  .np {
+    bottom: calc(-1 * var(--vgap, 0px));
+  }
+  .modal-back,
+  .menu-back {
+    bottom: calc(-1 * var(--vgap, 0px));
+  }
+  .menu {
+    bottom: calc(0px - var(--vgap, 0px));
+  }
+}
