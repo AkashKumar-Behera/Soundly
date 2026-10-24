@@ -64,6 +64,10 @@ interface ConnectState {
   devices: Device[]
   /** The device being controlled from this one (null: this device plays). */
   remoteId: string | null
+  /** A device that follows this one (and the other way round) while both play together. */
+  linkedId: string | null
+  /** Play together with another device, or go back to playing separately. */
+  toggleSync: (deviceId: string) => void
   setName: (name: string) => void
   /** Plays what is queued here on another device. */
   playOn: (deviceId: string) => void
@@ -84,6 +88,25 @@ export const useConnect = create<ConnectState>((set, get) => ({
   kind: guessKind(),
   devices: [],
   remoteId: null,
+  linkedId: null,
+
+  toggleSync: (deviceId) => {
+    const p = usePlayer.getState()
+    if (get().linkedId === deviceId) {
+      sendLive({ type: 'cmd', to: deviceId, cmd: 'unlink', payload: null })
+      set({ linkedId: null })
+      useUi.getState().showToast('Playing separately')
+      return
+    }
+    set({ linkedId: deviceId })
+    sendLive({ type: 'cmd', to: deviceId, cmd: 'link', payload: null })
+    // The other device joins in with the same song and position.
+    if (p.queue.length) {
+      const from = Math.max(0, p.index - 1)
+      sendLive({ type: 'cmd', to: deviceId, cmd: 'play', payload: { songs: p.queue.slice(from, from + 40), index: p.index - from, position: p.time, playing: p.playing } })
+    }
+    useUi.getState().showToast('Playing together')
+  },
 
   setName: (name) => {
     const clean = name.trim().slice(0, 40) || guessName()
@@ -137,7 +160,11 @@ function publish(force = false) {
 
 type Cmd = { type: 'cmd'; from: string; cmd: string; payload: unknown }
 
+/** Commands that arrive from the partner must not be echoed back to it. */
+let quietUntil = 0
+
 function handle(e: Cmd) {
+  quietUntil = Date.now() + 1800
   const p = usePlayer.getState()
   const payload = (e.payload ?? {}) as Record<string, unknown>
   switch (e.cmd) {
@@ -148,11 +175,21 @@ function handle(e: Cmd) {
       p.playQueue(songs.map((s) => ({ ...s, src: useLibrary.getState().songs.find((x) => x.id === s.id)?.src ?? s.src })), Number(payload.index) || 0)
       const at = Number(payload.position) || 0
       if (at > 1) setTimeout(() => usePlayer.getState().seek(at), 600)
+      if (payload.playing === false) setTimeout(() => usePlayer.getState().playing && usePlayer.getState().toggle(), 900)
       useConnect.setState({ remoteId: null })
       break
     }
     case 'toggle':
       p.toggle()
+      break
+    case 'setPlaying':
+      if (Boolean(payload.playing) !== p.playing) p.toggle()
+      break
+    case 'link':
+      useConnect.setState({ linkedId: e.from })
+      break
+    case 'unlink':
+      useConnect.setState({ linkedId: null })
       break
     case 'next':
       p.next()
@@ -200,7 +237,20 @@ export function startConnect() {
   usePlayer.subscribe((s, prev) => {
     const a = s.queue[s.index]
     const b = prev.queue[prev.index]
-    if (a?.id !== b?.id || s.playing !== prev.playing) publish(true)
+    const changed = a?.id !== b?.id || s.playing !== prev.playing
+    if (changed) publish(true)
+
+    // Playing together: whatever happens here (song, pause or play, a jump in the song) happens on the partner too.
+    const link = useConnect.getState().linkedId
+    if (!link || Date.now() < quietUntil) return
+    if (a?.id !== b?.id && a) {
+      const from = Math.max(0, s.index - 1)
+      sendLive({ type: 'cmd', to: link, cmd: 'play', payload: { songs: s.queue.slice(from, from + 40), index: s.index - from, position: 0, playing: s.playing } })
+    } else if (s.playing !== prev.playing) {
+      sendLive({ type: 'cmd', to: link, cmd: 'setPlaying', payload: { playing: s.playing } })
+    } else if (Math.abs(s.time - prev.time) > 3 && a?.id === b?.id) {
+      sendLive({ type: 'cmd', to: link, cmd: 'seek', payload: { position: s.time } })
+    }
   })
   setInterval(() => {
     if (usePlayer.getState().playing) publish(true)

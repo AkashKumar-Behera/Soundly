@@ -21,6 +21,8 @@ function Row({ d, now }: { d: Device; now: number }) {
   const playOn = useConnect((s) => s.playOn)
   const playHere = useConnect((s) => s.playHere)
   const control = useConnect((s) => s.control)
+  const linked = useConnect((s) => s.linkedId === d.id)
+  const toggleSync = useConnect((s) => s.toggleSync)
   const st = d.state
   // A state older than a minute while "playing" means that device went away without saying so.
   const live = !!st && (!st.playing || now - st.at < 60000)
@@ -69,6 +71,11 @@ function Row({ d, now }: { d: Device; now: number }) {
             Play here
           </button>
         )}
+        {!d.away && (
+          <button className={`btn-pill ${linked ? '' : 'ghost'}`} onClick={() => toggleSync(d.id)} aria-pressed={linked}>
+            {linked ? 'Synced · tap to separate' : 'Play together'}
+          </button>
+        )}
         <button className="btn-pill ghost" onClick={() => playOn(d.id)}>
           Play on this
         </button>
@@ -86,6 +93,8 @@ export function DevicesSheet() {
   const setName = useConnect((s) => s.setName)
   const current = useCurrent()
   const playing = usePlayer((s) => s.playing)
+  const time = usePlayer((s) => s.time)
+  const duration = usePlayer((s) => s.duration)
   const [editing, setEditing] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -124,8 +133,34 @@ export function DevicesSheet() {
                 {name} <span className="muted">(this device)</span>
               </div>
             )}
+            <div className="dev-status">
+              <i className="dot on" />
+              <span>Online · this device</span>
+            </div>
             <div className="truncate muted">{current ? `${playing ? 'Playing' : 'Paused'} · ${current.title}` : 'Nothing playing'}</div>
+            {current && duration > 0 && (
+              <div className="dev-prog">
+                <span>{formatTime(time)}</span>
+                <div className="dev-bar">
+                  <div style={{ width: `${Math.min(100, (time / duration) * 100)}%` }} />
+                </div>
+                <span>{formatTime(duration)}</span>
+              </div>
+            )}
           </div>
+          {current && (
+            <div className="dev-ctrl">
+              <button className="icon-btn" aria-label="Previous" onClick={() => usePlayer.getState().prev()}>
+                <SkipBack size={18} fill="currentColor" />
+              </button>
+              <button className="icon-btn" aria-label={playing ? 'Pause' : 'Play'} onClick={() => usePlayer.getState().toggle()}>
+                {playing ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+              </button>
+              <button className="icon-btn" aria-label="Next" onClick={() => usePlayer.getState().next()}>
+                <SkipForward size={18} fill="currentColor" />
+              </button>
+            </div>
+          )}
           <button className="icon-btn" aria-label="Rename this device" onClick={() => setEditing(name)}>
             <Pencil size={16} />
           </button>
