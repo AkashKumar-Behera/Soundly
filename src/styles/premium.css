@@ -424,3 +424,27 @@ a,
     padding-bottom: calc(138px + env(safe-area-inset-bottom) * 0.3);
   }
 }
+
+.import-box {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 8px;
+}
+.import-box input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  outline: 0;
+}
+.import-box input:focus {
+  border-color: var(--accent);
+}
+.community-note {
+  margin: -6px 0 10px;
+}

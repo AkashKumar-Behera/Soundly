@@ -15,9 +15,11 @@ interface PlaylistRow {
   is_public: number
   songCount: number
   pendingCount: number
+  ownerName?: string | null
 }
 
-const shape = (p: PlaylistRow, userId: string) => ({
+// The creator is only revealed to admins; everyone else just sees the playlist.
+const shape = (p: PlaylistRow, userId: string, admin = false) => ({
   id: p.id,
   title: p.title,
   description: p.description,
@@ -26,28 +28,32 @@ const shape = (p: PlaylistRow, userId: string) => ({
   isOwner: p.owner_id === userId,
   songCount: p.songCount,
   pendingCount: p.pendingCount,
+  ...(admin ? { ownerName: p.ownerName ?? null } : {}),
 })
 
 playlists.get('/', async (c) => {
   const userId = c.get('user').id
+  const admin = c.get('user').role === 'admin'
   const { results } = await c.env.DB.prepare(
     `SELECT p.*, (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) AS songCount,
-            (SELECT COUNT(*) FROM import_items ii WHERE ii.playlist_id = p.id) AS pendingCount
-     FROM playlists p WHERE p.is_public = 1 OR p.owner_id = ? ORDER BY p.created_at, p.title`,
+            (SELECT COUNT(*) FROM import_items ii WHERE ii.playlist_id = p.id) AS pendingCount,
+            (SELECT u.name FROM users u WHERE u.id = p.owner_id) AS ownerName
+     FROM playlists p WHERE p.is_public = 1 OR p.owner_id = ?1 OR ?2 = 1 ORDER BY p.created_at, p.title`,
   )
-    .bind(userId)
+    .bind(userId, admin ? 1 : 0)
     .all<PlaylistRow>()
-  return c.json({ playlists: results.map((p) => shape(p, userId)) })
+  return c.json({ playlists: results.map((p) => shape(p, userId, admin)) })
 })
 
 async function loadPlayable(c: { env: AppEnv['Bindings']; get: (k: 'user') => AppEnv['Variables']['user'] }, id: string) {
   const userId = c.get('user').id
   return c.env.DB.prepare(
     `SELECT p.*, (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) AS songCount,
-            (SELECT COUNT(*) FROM import_items ii WHERE ii.playlist_id = p.id) AS pendingCount
-     FROM playlists p WHERE p.id = ? AND (p.is_public = 1 OR p.owner_id = ?)`,
+            (SELECT COUNT(*) FROM import_items ii WHERE ii.playlist_id = p.id) AS pendingCount,
+            (SELECT u.name FROM users u WHERE u.id = p.owner_id) AS ownerName
+     FROM playlists p WHERE p.id = ?1 AND (p.is_public = 1 OR p.owner_id = ?2 OR ?3 = 1)`,
   )
-    .bind(id, userId)
+    .bind(id, userId, c.get('user').role === 'admin' ? 1 : 0)
     .first<PlaylistRow>()
 }
 
@@ -67,7 +73,7 @@ playlists.get('/:id', async (c) => {
     .bind(id, userId)
     .all<Parameters<typeof shapeSong>[0]>()
 
-  return c.json({ ...shape(pl, userId), songs: results.map(shapeSong) })
+  return c.json({ ...shape(pl, userId, c.get('user').role === 'admin'), songs: results.map(shapeSong) })
 })
 
 playlists.post('/', async (c) => {
@@ -79,7 +85,7 @@ playlists.post('/', async (c) => {
 
   const id = crypto.randomUUID()
   const hue = Math.floor(Math.random() * 360)
-  await c.env.DB.prepare('INSERT INTO playlists (id, owner_id, title, description, hue) VALUES (?, ?, ?, ?, ?)')
+  await c.env.DB.prepare('INSERT INTO playlists (id, owner_id, title, description, hue, is_public) VALUES (?, ?, ?, ?, ?, 1)')
     .bind(id, user.id, title, (body.description ?? '').trim().slice(0, 300), hue)
     .run()
   return c.json({ id, title, hue }, 201)
@@ -88,7 +94,7 @@ playlists.post('/', async (c) => {
 playlists.post('/:id/songs', async (c) => {
   const user = c.get('user')
   const id = c.req.param('id')
-  const owned = await c.env.DB.prepare('SELECT 1 AS ok FROM playlists WHERE id = ? AND owner_id = ?').bind(id, user.id).first()
+  const owned = await c.env.DB.prepare('SELECT 1 AS ok FROM playlists WHERE id = ? AND (owner_id = ? OR ? = 1)').bind(id, user.id, user.role === 'admin' ? 1 : 0).first()
   if (!owned) return c.json({ error: 'forbidden' }, 403)
 
   const body = await c.req.json<{ songId?: string }>().catch(() => ({}) as { songId?: string })
@@ -105,8 +111,8 @@ playlists.post('/:id/songs', async (c) => {
 })
 
 playlists.delete('/:id/songs/:songId', async (c) => {
-  const owned = await c.env.DB.prepare('SELECT 1 AS ok FROM playlists WHERE id = ? AND owner_id = ?')
-    .bind(c.req.param('id'), c.get('user').id)
+  const owned = await c.env.DB.prepare('SELECT 1 AS ok FROM playlists WHERE id = ? AND (owner_id = ? OR ? = 1)')
+    .bind(c.req.param('id'), c.get('user').id, c.get('user').role === 'admin' ? 1 : 0)
     .first()
   if (!owned) return c.json({ error: 'forbidden' }, 403)
   await c.env.DB.prepare('DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?').bind(c.req.param('id'), c.req.param('songId')).run()
@@ -114,16 +120,23 @@ playlists.delete('/:id/songs/:songId', async (c) => {
 })
 
 playlists.patch('/:id', async (c) => {
-  const body = await c.req.json<{ title?: string }>().catch(() => ({}) as { title?: string })
+  const body = await c.req.json<{ title?: string; isPublic?: boolean }>().catch(() => ({}) as { title?: string; isPublic?: boolean })
+  const user = c.get('user')
+  const admin = user.role === 'admin' ? 1 : 0
+  if (typeof body.isPublic === 'boolean') {
+    const r = await c.env.DB.prepare('UPDATE playlists SET is_public = ? WHERE id = ? AND (owner_id = ? OR ? = 1)').bind(body.isPublic ? 1 : 0, c.req.param('id'), user.id, admin).run()
+    if (!r.meta.changes) return c.json({ error: 'forbidden' }, 403)
+    if (body.title === undefined) return c.json({ ok: true })
+  }
   const title = (body.title ?? '').trim().slice(0, 80)
   if (!title) return c.json({ error: 'title_required' }, 400)
-  const res = await c.env.DB.prepare('UPDATE playlists SET title = ? WHERE id = ? AND owner_id = ?').bind(title, c.req.param('id'), c.get('user').id).run()
+  const res = await c.env.DB.prepare('UPDATE playlists SET title = ? WHERE id = ? AND (owner_id = ? OR ? = 1)').bind(title, c.req.param('id'), user.id, admin).run()
   if (!res.meta.changes) return c.json({ error: 'forbidden' }, 403)
   return c.json({ ok: true })
 })
 
 playlists.delete('/:id', async (c) => {
-  const res = await c.env.DB.prepare('DELETE FROM playlists WHERE id = ? AND owner_id = ?').bind(c.req.param('id'), c.get('user').id).run()
+  const res = await c.env.DB.prepare('DELETE FROM playlists WHERE id = ? AND (owner_id = ? OR ? = 1)').bind(c.req.param('id'), c.get('user').id, c.get('user').role === 'admin' ? 1 : 0).run()
   if (!res.meta.changes) return c.json({ error: 'forbidden' }, 403)
   return c.json({ ok: true })
 })

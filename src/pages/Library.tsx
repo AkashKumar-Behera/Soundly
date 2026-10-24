@@ -28,6 +28,21 @@ export function Library() {
   const remembered = rememberedSongs()
   const downloaded: Song[] = Object.keys(saved).map((id) => songs.find((s) => s.id === id) ?? remembered[id]).filter((s): s is Song => !!s)
   const mode = useLibrary((s) => s.mode)
+  const [importLink, setImportLink] = useState('')
+  // Playlists you made (or that came with the app) and ones other people shared. Who made them is only for admins.
+  const mine = playlists.filter((p) => p.isOwner)
+  const community = playlists.filter((p) => !p.isOwner)
+  const renderPlaylist = (p: (typeof playlists)[number]) => (
+    <Card
+      key={p.id}
+      hue={p.hue}
+      title={p.title}
+      subtitle={`${p.songCount} songs${p.ownerName ? ` · ${p.ownerName}` : ''}`}
+      playing={playing && sourceId === p.id}
+      onOpen={() => navigate(`/playlist/${p.id}`)}
+      onPlay={() => void playPlaylist(p.id)}
+    />
+  )
   const setCreatePlaylist = useUi((s) => s.setCreatePlaylist)
 
   useEffect(() => {
@@ -73,18 +88,32 @@ export function Library() {
             <div className="card-title">Liked Songs</div>
             <div className="card-sub">{likedIds.length} songs</div>
           </div>
-          {playlists.map((p) => (
-            <Card
-              key={p.id}
-              hue={p.hue}
-              title={p.title}
-              subtitle={`${p.songCount} songs`}
-              playing={playing && sourceId === p.id}
-              onOpen={() => navigate(`/playlist/${p.id}`)}
-              onPlay={() => void playPlaylist(p.id)}
-            />
-          ))}
+          {mine.map(renderPlaylist)}
         </div>
+      )}
+
+      {filter === 'playlists' && mode === 'api' && (
+        <form
+          className="import-box"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const link = importLink.trim()
+            if (link) navigate(`/search?q=${encodeURIComponent(link)}`)
+          }}
+        >
+          <input value={importLink} onChange={(e) => setImportLink(e.target.value)} placeholder="Paste a YouTube playlist link to import it" inputMode="url" autoCapitalize="off" autoCorrect="off" />
+          <button className="btn-pill" type="submit" disabled={!importLink.trim()}>
+            Import
+          </button>
+        </form>
+      )}
+
+      {filter === 'playlists' && community.length > 0 && (
+        <>
+          <h2 className="section-title">Community playlists</h2>
+          <p className="muted community-note">Playlists shared by everyone in Soundly.</p>
+          <div className="grid">{community.map(renderPlaylist)}</div>
+        </>
       )}
 
       {filter !== 'playlists' && (

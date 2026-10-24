@@ -283,7 +283,7 @@ youtube.post('/import', async (c) => {
 
   const title = ((body.title ?? '').trim() || data.title).slice(0, 80)
   const playlistId = crypto.randomUUID()
-  await db.prepare("INSERT INTO playlists (id, owner_id, title, description, hue, is_public) VALUES (?, ?, ?, 'Imported from YouTube', ?, 0)").bind(playlistId, user.id, title, Math.floor(Math.random() * 360)).run()
+  await db.prepare("INSERT INTO playlists (id, owner_id, title, description, hue, is_public) VALUES (?, ?, ?, 'Imported from YouTube', ?, 1)").bind(playlistId, user.id, title, Math.floor(Math.random() * 360)).run()
 
   let inLibrary = 0
   let queued = 0

@@ -1,11 +1,11 @@
 import { ArrowDownToLine, Check, Heart, Pause, Play, Shuffle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Globe, Lock, Pencil, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Cover } from '../components/Cover'
 import { SongRow } from '../components/SongRow'
 import type { Song } from '../data/mock'
-import { useLibrary } from '../store/library'
+import { useLibrary, useRole } from '../store/library'
 import type { Playlist as PlaylistInfo } from '../store/library'
 import { useCanSaveOffline } from '../lib/useOfflineSave'
 import { useOffline } from '../store/offline'
@@ -22,6 +22,8 @@ export function Playlist() {
   const likedIds = useLibrary((s) => s.liked)
   const playlistsState = useLibrary((s) => s.playlists)
   const renamePlaylist = useLibrary((s) => s.renamePlaylist)
+  const setPublic = useLibrary((s) => s.setPlaylistPublic)
+  const role = useRole()
   const [renaming, setRenaming] = useState<string | null>(null)
   const playing = usePlayer((s) => s.playing)
   const sourceId = usePlayer((s) => s.sourceId)
@@ -51,6 +53,7 @@ export function Playlist() {
   const { playlist: pl, songs: list } = data
   const total = list.reduce((n, s) => n + s.duration, 0)
   const here = sourceId === id
+  const canEdit = (pl.isOwner || role === 'admin') && !isLiked
   const play = () => (here ? toggle() : playQueue(list, 0, id))
   const allSaved = list.length > 0 && list.every((s) => saved[s.id] !== undefined)
 
@@ -105,7 +108,7 @@ export function Playlist() {
             </p>
           )}
           <p className="pl-stats">
-            <b>Soundly</b> · {list.length} songs{total ? `, ${Math.round(total / 60)} min` : ''}
+            <b>Soundly</b>{pl.ownerName ? ` · by ${pl.ownerName}` : ''} · {list.length} songs{total ? `, ${Math.round(total / 60)} min` : ''}
           </p>
         </div>
       </div>
@@ -129,12 +132,17 @@ export function Playlist() {
           {allSaved ? <Check size={16} /> : <ArrowDownToLine size={16} />}
           {progress ? `Saving ${progress}` : allSaved ? 'Saved on this device' : 'Save for offline'}
         </button>
-        {pl.isOwner && !isLiked && (
+        {canEdit && (
+          <button className="icon-btn" aria-label={pl.isPublic ? 'Make private' : 'Share with everyone'} title={pl.isPublic ? 'Shared with everyone. Tap to make private' : 'Private. Tap to share with everyone'} onClick={() => void setPublic(id, !pl.isPublic).then((ok) => showToast(ok ? (pl.isPublic ? 'Now private' : 'Shared with everyone') : 'Could not change that'))}>
+            {pl.isPublic ? <Globe size={20} /> : <Lock size={20} />}
+          </button>
+        )}
+        {canEdit && (
           <button className="icon-btn" aria-label="Rename playlist" onClick={() => setRenaming(pl.title)}>
             <Pencil size={20} />
           </button>
         )}
-        {pl.isOwner && !isLiked && (
+        {canEdit && (
           <button className="icon-btn bad" aria-label="Delete playlist" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={20} />
           </button>

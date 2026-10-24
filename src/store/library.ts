@@ -29,6 +29,9 @@ export interface Playlist {
   /** Songs of an imported playlist that are still waiting to be downloaded. */
   pendingCount?: number
   isOwner?: boolean
+  isPublic?: boolean
+  /** Only sent to admins. */
+  ownerName?: string | null
 }
 
 export interface SongRequest {
@@ -177,6 +180,7 @@ interface LibraryState {
   deletePlaylist: (id: string) => Promise<boolean>
   createPlaylist: (title: string) => Promise<string | null>
   renamePlaylist: (id: string, title: string) => Promise<boolean>
+  setPlaylistPublic: (id: string, isPublic: boolean) => Promise<boolean>
   addToPlaylist: (playlistId: string, songId: string) => Promise<boolean>
   removeFromPlaylist: (playlistId: string, songId: string) => Promise<boolean>
   createRequest: (input: RequestInput) => Promise<RequestResult>
@@ -351,6 +355,16 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       return r.id
     } catch {
       return null
+    }
+  },
+
+  setPlaylistPublic: async (id, isPublic) => {
+    try {
+      await api(`/playlists/${id}`, { method: 'PATCH', body: { isPublic } })
+      await get().load()
+      return true
+    } catch {
+      return false
     }
   },
 
