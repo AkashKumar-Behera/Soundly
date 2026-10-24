@@ -8,6 +8,7 @@ import { ListenTogether, RoomPill } from './ListenTogether'
 import { MobileNav } from './MobileNav'
 import { NowPlaying } from './NowPlaying'
 import { PlayerBar } from './PlayerBar'
+import { DevicesSheet } from './DevicesSheet'
 import { SongMenuHost } from './SongMenu'
 import '../lib/radio'
 import { Sidebar } from './Sidebar'
@@ -52,6 +53,7 @@ export function Layout() {
       <MobileNav />
       <NowPlaying />
       <SongMenuHost />
+      <DevicesSheet />
       <Toast />
     </div>
   )

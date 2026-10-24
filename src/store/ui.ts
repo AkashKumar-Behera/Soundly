@@ -15,6 +15,8 @@ interface UiState {
   /** Set when a new app version is ready; calling it installs the update and reloads. */
   applyUpdate: (() => void) | null
   roomModal: boolean
+  devicesOpen: boolean
+  setDevicesOpen: (open: boolean) => void
   songMenu: SongMenuState | null
   playlistPicker: Song | null
   lyricsEditor: Song | null
@@ -36,6 +38,8 @@ export const useUi = create<UiState>((set) => ({
   toast: null,
   applyUpdate: null,
   roomModal: false,
+  devicesOpen: false,
+  setDevicesOpen: (devicesOpen) => set({ devicesOpen }),
   songMenu: null,
   playlistPicker: null,
   lyricsEditor: null,

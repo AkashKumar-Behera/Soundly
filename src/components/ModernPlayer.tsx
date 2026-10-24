@@ -1,4 +1,4 @@
-import { ChevronDown, Heart, ListMusic, Mic2, MoreVertical, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronDown, Heart, ListMusic, Mic2, MonitorSpeaker, MoreVertical, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import type { Song } from '../data/mock'
@@ -166,6 +166,9 @@ export function ModernPlayer({ song, h1, h2, grab }: { song: Song; h1: number; h
           </button>
           <button className={liked ? 'on' : ''} aria-label={liked ? 'Remove from liked songs' : 'Add to liked songs'} aria-pressed={liked} onClick={() => toggleLike(song.id)}>
             <Heart size={22} fill={liked ? 'currentColor' : 'none'} />
+          </button>
+          <button aria-label="Connect to a device" onClick={() => useUi.getState().setDevicesOpen(true)}>
+            <MonitorSpeaker size={22} />
           </button>
           <button className={view === 'lyrics' ? 'on' : ''} aria-label="Lyrics" aria-pressed={view === 'lyrics'} onClick={() => toggleView('lyrics')}>
             <Mic2 size={22} />

@@ -66,7 +66,8 @@ export class AgentHub extends DurableObject<Env> {
     const [client, server] = Object.values(pair)
 
     if (request.headers.get('X-Live') === '1') {
-      this.ctx.acceptWebSocket(server, ['client'])
+      const user = (request.headers.get('X-User') ?? '').slice(0, 64)
+      this.ctx.acceptWebSocket(server, user ? ['client', `u:${user}`] : ['client'])
       return new Response(null, { status: 101, webSocket: client })
     }
 
@@ -98,10 +99,81 @@ export class AgentHub extends DurableObject<Env> {
     }
   }
 
+  /** The devices of one signed-in user, read from what each connection stored about itself. */
+  private devicesOf(userTag: string, except?: WebSocket) {
+    const out: { id: string; name: string; kind: string; state: unknown }[] = []
+    for (const s of this.ctx.getWebSockets(userTag)) {
+      if (s === except) continue
+      const a = s.deserializeAttachment() as { id?: string; name?: string; kind?: string; state?: unknown } | null
+      if (a?.id) out.push({ id: a.id, name: a.name ?? 'Device', kind: a.kind ?? 'web', state: a.state ?? null })
+    }
+    return out
+  }
+
+  private tellDevices(userTag: string, except?: WebSocket): void {
+    const text = JSON.stringify({ type: 'devices', devices: this.devicesOf(userTag, except) })
+    for (const s of this.ctx.getWebSockets(userTag)) {
+      if (s === except) continue
+      try {
+        s.send(text)
+      } catch {
+        // closing
+      }
+    }
+  }
+
+  /** Messages from an app: it introduces itself, shares what it is playing, and sends commands to its other devices. */
+  private handleClient(ws: WebSocket, userTag: string, message: string): void {
+    let msg: { type?: string; id?: string; name?: string; kind?: string; state?: unknown; to?: string; cmd?: string; payload?: unknown }
+    try {
+      msg = JSON.parse(message)
+    } catch {
+      return
+    }
+    const mine = (ws.deserializeAttachment() as { id?: string; name?: string; kind?: string; state?: unknown } | null) ?? {}
+
+    if (msg.type === 'hello' && typeof msg.id === 'string') {
+      // A reload or reconnect of the same device replaces its older connection.
+      for (const s of this.ctx.getWebSockets(userTag)) {
+        if (s !== ws && (s.deserializeAttachment() as { id?: string } | null)?.id === msg.id) s.close(1000, 'replaced')
+      }
+      ws.serializeAttachment({ id: msg.id.slice(0, 40), name: String(msg.name ?? 'Device').slice(0, 40), kind: String(msg.kind ?? 'web').slice(0, 12), state: null })
+      this.tellDevices(userTag)
+      return
+    }
+    if (!mine.id) return
+
+    if (msg.type === 'state') {
+      ws.serializeAttachment({ ...mine, state: msg.state ?? null })
+      this.tellDevices(userTag)
+      return
+    }
+    if (msg.type === 'rename' && typeof msg.name === 'string') {
+      ws.serializeAttachment({ ...mine, name: msg.name.slice(0, 40) })
+      this.tellDevices(userTag)
+      return
+    }
+    if (msg.type === 'cmd' && typeof msg.to === 'string' && typeof msg.cmd === 'string') {
+      const text = JSON.stringify({ type: 'cmd', from: mine.id, fromName: mine.name, cmd: msg.cmd.slice(0, 20), payload: msg.payload ?? null })
+      for (const s of this.ctx.getWebSockets(userTag)) {
+        if ((s.deserializeAttachment() as { id?: string } | null)?.id === msg.to) {
+          try {
+            s.send(text)
+          } catch {
+            // closing
+          }
+        }
+      }
+    }
+  }
+
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== 'string') return
-    // Apps only listen. Only the agent talks back.
-    if (!this.ctx.getTags(ws).includes('agent')) return
+    const tags = this.ctx.getTags(ws)
+    const userTag = tags.find((t) => t.startsWith('u:'))
+    if (userTag && tags.includes('client')) return this.handleClient(ws, userTag, message)
+    // Other apps only listen. Only the agent talks back.
+    if (!tags.includes('agent')) return
 
     let msg: { type?: string; agentId?: string; version?: string; onHomeWifi?: boolean; jobId?: string | null; stage?: string; progress?: number; etaSec?: number | null; speedBps?: number | null }
     try {
@@ -147,7 +219,10 @@ export class AgentHub extends DurableObject<Env> {
     } catch {
       // already closed
     }
-    if (this.ctx.getTags(ws).includes('agent')) this.emit({ type: 'hint', topic: 'agent' })
+    const tags = this.ctx.getTags(ws)
+    if (tags.includes('agent')) this.emit({ type: 'hint', topic: 'agent' })
+    const userTag = tags.find((t) => t.startsWith('u:'))
+    if (userTag) this.tellDevices(userTag, ws)
   }
 
   private async status(): Promise<HubStatus> {

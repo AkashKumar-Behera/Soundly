@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { DragControls } from 'motion/react'
-import { ChevronDown, Heart, MoreHorizontal, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronDown, Heart, MonitorSpeaker, MoreHorizontal, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useApp } from '../store/app'
@@ -71,6 +71,9 @@ function Content({ controls }: { controls: DragControls }) {
         </button>
         <span>Playing from your library</span>
         <div className="np-head-right">
+          <button className="icon-btn" aria-label="Connect to a device" onClick={() => useUi.getState().setDevicesOpen(true)}>
+            <MonitorSpeaker size={22} />
+          </button>
           <button className={`icon-btn ${inRoom ? 'on' : ''}`} aria-label="Listen together" onClick={() => setRoomModal(true)}>
             <Users size={22} />
           </button>

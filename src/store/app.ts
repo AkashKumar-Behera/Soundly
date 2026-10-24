@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
-export type UiStyle = 'classic' | 'blend'
+export type UiStyle = 'classic' | 'blend' | 'spotify'
 export type PlayerStyle = 'classic' | 'immersive' | 'vinyl' | 'modern'
 export type LogoChoice = 'bars' | 'gold'
 

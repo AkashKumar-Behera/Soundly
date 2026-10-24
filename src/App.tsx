@@ -5,6 +5,7 @@ import { BackOnline, OfflineScreen } from './components/OfflineScreen'
 import { Maintenance, Splash } from './components/Splash'
 import { useConnection } from './store/connection'
 import { startLive, stopLive } from './lib/live'
+import { startConnect } from './store/connect'
 import { Admin } from './pages/admin/Admin'
 import { Home } from './pages/Home'
 import { ArtistPage } from './pages/ArtistPage'
@@ -60,7 +61,10 @@ export default function App() {
     if (justBack) void load()
   }, [justBack, load])
   useEffect(() => {
-    if (status === 'ready' && mode === 'api') startLive()
+    if (status === 'ready' && mode === 'api') {
+      startLive()
+      startConnect()
+    }
     else if (status === 'unauth') stopLive()
   }, [status, mode])
   if (status === 'loading') return <Splash />

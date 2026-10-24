@@ -18,5 +18,6 @@ live.get('/', async (c): Promise<Response> => {
   if (!allowedOrigin(c.env, c.req.header('Origin'))) return c.json({ error: 'bad_origin' }, 403)
   const headers = new Headers(c.req.raw.headers)
   headers.set('X-Live', '1')
+  headers.set('X-User', c.get('user').id) // from the session, never from the client
   return c.env.AGENT_HUB.get(c.env.AGENT_HUB.idFromName('main')).fetch(new Request(c.req.raw, { headers }))
 })

@@ -982,3 +982,228 @@ a,
   border-color: var(--accent);
   color: var(--text);
 }
+
+/* ---------- Connect to a device ---------- */
+.dev-sheet {
+  width: min(480px, 100%);
+}
+.dev-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid transparent;
+}
+.dev-row.on {
+  border-color: var(--accent);
+}
+.dev-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+.dev-row.on .dev-ico {
+  color: var(--accent);
+}
+.dev-ctrl {
+  display: flex;
+  align-items: center;
+}
+.dev-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+
+/* ============================================================
+   "Spotify look" (experimental): the same layout ideas, flat true-black panels, tight corners, flat bars.
+   It copies how an interface is arranged, not Spotify's name, logo or typeface.
+   ============================================================ */
+:root[data-ui='spotify'][data-theme='dark'],
+:root[data-ui='spotify'] {
+  --radius: 8px;
+  --radius-lg: 10px;
+  --glass: #181818;
+  --glass-line: transparent;
+}
+:root[data-ui='spotify'][data-theme='dark'] {
+  --bg: #000;
+  --panel: #121212;
+  --panel-2: #1a1a1a;
+  --hover: #2a2a2a;
+  --text: #fff;
+  --muted: #b3b3b3;
+  --line: rgb(255 255 255 / 0.06);
+  --accent: #1ed760;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+:root[data-ui='spotify'] body,
+:root[data-ui='spotify'] .app {
+  background: #000;
+}
+:root[data-ui='spotify'] .sidebar,
+:root[data-ui='spotify'] .main {
+  background: var(--panel);
+  box-shadow: none;
+}
+:root[data-ui='spotify'] .nav-item {
+  font-weight: 700;
+  color: var(--muted);
+}
+:root[data-ui='spotify'] .nav-item.active,
+:root[data-ui='spotify'] .nav-item:hover {
+  color: #fff;
+  background: transparent;
+}
+:root[data-ui='spotify'] .page {
+  background: linear-gradient(180deg, #1c3d2b 0, #121212 330px);
+}
+:root[data-ui='spotify'] .page-title,
+:root[data-ui='spotify'] .greet,
+:root[data-ui='spotify'] .section-title,
+:root[data-ui='spotify'] .shelf-head h2 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: none;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+}
+:root[data-ui='spotify'] .card {
+  background: #181818;
+  border-radius: 8px;
+  padding: 14px;
+}
+:root[data-ui='spotify'] .card:hover {
+  background: #282828;
+  transform: none;
+}
+:root[data-ui='spotify'] .card-art .cover,
+:root[data-ui='spotify'] .card-art img {
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+:root[data-ui='spotify'] .fab,
+:root[data-ui='spotify'] .play-btn.xl {
+  background: #1ed760;
+  color: #000;
+}
+:root[data-ui='spotify'] .play-btn {
+  background: #fff;
+}
+:root[data-ui='spotify'] .quick-item {
+  background: rgb(255 255 255 / 0.1);
+  border: 0;
+  border-radius: 4px;
+  height: 56px;
+}
+:root[data-ui='spotify'] .quick-item:hover {
+  background: rgb(255 255 255 / 0.2);
+}
+:root[data-ui='spotify'] .song-row {
+  border-radius: 4px;
+}
+:root[data-ui='spotify'] .song-row:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+:root[data-ui='spotify'] .chip {
+  background: rgb(255 255 255 / 0.1);
+  border-radius: 16px;
+}
+:root[data-ui='spotify'] .chip.on {
+  background: #1ed760;
+  color: #000;
+}
+:root[data-ui='spotify'] .playerbar {
+  background: #000;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+:root[data-ui='spotify'] .search {
+  background: #242424;
+  border-radius: 500px;
+  border: 0;
+}
+:root[data-ui='spotify'] .search:focus-within {
+  border: 2px solid #fff;
+}
+:root[data-ui='spotify'] .cat {
+  border-radius: 8px;
+  box-shadow: none;
+}
+:root[data-ui='spotify'] .btn-pill {
+  border-radius: 500px;
+}
+
+@media (max-width: 860px) {
+  :root[data-ui='spotify'] .main {
+    background: #121212;
+  }
+  :root[data-ui='spotify'] .mobile-nav {
+    background: linear-gradient(180deg, rgb(0 0 0 / 0) 0, rgb(0 0 0 / 0.92) 40%, #000 100%);
+    padding: 12px 0 max(6px, calc(env(safe-area-inset-bottom) - 14px));
+    left: 0;
+    right: 0;
+    gap: 0;
+  }
+  :root[data-ui='spotify'] .tabs {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 4px 6px 0;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :root[data-ui='spotify'] .tab {
+    border-radius: 0;
+    background: transparent;
+    color: #b3b3b3;
+  }
+  :root[data-ui='spotify'] .tab.active {
+    background: transparent;
+    color: #fff;
+  }
+  :root[data-ui='spotify'] .tab.active svg {
+    color: #fff;
+    stroke-width: 2.6;
+  }
+  :root[data-ui='spotify'] .mini {
+    margin: 0 8px 6px;
+    border-radius: 8px;
+    background: #2b3f4c;
+    border: 0;
+    box-shadow: none;
+  }
+  :root[data-ui='spotify'] .mini-play {
+    background: transparent;
+    color: #fff;
+  }
+  :root[data-ui='spotify'] .topbar .top-search {
+    background: transparent;
+    border: 0;
+  }
+  :root[data-ui='spotify'] .grid .card {
+    background: transparent;
+    padding: 6px 4px;
+  }
+  :root[data-ui='spotify'] .grid .card-art .cover {
+    border-radius: 4px;
+  }
+  :root[data-ui='spotify'] .cats {
+    gap: 12px;
+  }
+  :root[data-ui='spotify'] .cat {
+    border-radius: 6px;
+    height: 100px;
+  }
+}

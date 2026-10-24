@@ -1,4 +1,4 @@
-import { Heart, ListMusic, Maximize2, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { Heart, ListMusic, Maximize2, MonitorSpeaker, Users, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { useLibrary } from '../store/library'
 import { useCurrent, usePlayer } from '../store/player'
 import { useRoom } from '../store/room'
@@ -76,6 +76,9 @@ export function PlayerBar() {
       </div>
 
       <div className="pb-right">
+        <button className="icon-btn" aria-label="Connect to a device" onClick={() => useUi.getState().setDevicesOpen(true)}>
+          <MonitorSpeaker size={18} />
+        </button>
         <button className={`icon-btn ${inRoom ? 'on' : ''}`} aria-label="Listen together" onClick={() => setRoomModal(true)}>
           <Users size={18} />
         </button>

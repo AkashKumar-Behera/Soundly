@@ -8,6 +8,7 @@ export type LiveEvent =
   | { type: 'hint'; topic: Topic }
 
 const listeners = new Set<(e: LiveEvent) => void>()
+const openers = new Set<() => void>()
 let ws: WebSocket | null = null
 let wanted = false
 let delay = 2000
@@ -30,6 +31,7 @@ function connect() {
     // Coming back after a gap: we may have missed changes, so every page refreshes once.
     if (everConnected) (['requests', 'library', 'agent', 'lyrics', 'artists', 'users'] as Topic[]).forEach((topic) => dispatch({ type: 'hint', topic }))
     everConnected = true
+    openers.forEach((fn) => fn())
   }
   socket.onmessage = (m) => {
     try {
@@ -94,4 +96,15 @@ export function useLiveReload(topics: Topic[], reload: () => void) {
 export function onLive(l: (e: LiveEvent) => void): () => void {
   listeners.add(l)
   return () => listeners.delete(l)
+}
+
+/** Sends a message to the server over the live connection (ignored while it is down). */
+export function sendLive(message: unknown): void {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message))
+}
+
+/** Runs `fn` each time the live connection (re)opens. */
+export function onLiveOpen(fn: () => void): () => void {
+  openers.add(fn)
+  return () => openers.delete(fn)
 }

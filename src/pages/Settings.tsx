@@ -120,6 +120,7 @@ export function Settings() {
           options={[
             { value: 'classic', label: 'Classic' },
             { value: 'blend', label: 'Blend' },
+            { value: 'spotify', label: 'Spotify look (experimental)' },
           ]}
         />
       </section>
