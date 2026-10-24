@@ -19,6 +19,7 @@ export async function queueInfo(db: D1Database): Promise<QueueInfo> {
              (SELECT updated_at, claimed_at FROM download_jobs WHERE status = 'done' AND claimed_at IS NOT NULL ORDER BY updated_at DESC LIMIT 20)`,
         )
         .first<{ sec: number | null }>(),
+      { shared: true },
     ),
   ])
   const base = running?.n ?? 0

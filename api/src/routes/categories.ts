@@ -22,7 +22,7 @@ const hueOf = (label: string) => {
 
 /** Genres as found, with their counts and any admin edits (label, colour, hidden). */
 async function loadGenres(db: D1Database) {
-  return memo('categories-raw', 5 * 60000, async () => {
+  return memo('categories-raw', 2 * 60000, async () => {
     const [counts, edits] = await Promise.all([
       db.prepare('SELECT genre, COUNT(*) AS n FROM songs GROUP BY genre').all<{ genre: string | null; n: number }>(),
       db.prepare('SELECT genre, label, hue, hidden FROM categories').all<Cat>(),
@@ -32,7 +32,7 @@ async function loadGenres(db: D1Database) {
       const e = byGenre.get(r.genre ?? OTHER)
       return { genre: r.genre, count: r.n, label: e?.label || r.genre || OTHER, hue: e?.hue ?? null, hidden: !!e?.hidden }
     })
-  })
+  }, { shared: true })
 }
 
 // ---------- For everyone: the categories to browse ----------

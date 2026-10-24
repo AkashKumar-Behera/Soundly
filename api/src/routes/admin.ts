@@ -113,9 +113,9 @@ admin.get('/stats', async (c) => {
   const db = c.env.DB
   const [users, songs, jobs, plays, agent, maxUsers, window, hub] = await Promise.all([
     db.prepare('SELECT COUNT(*) AS n FROM users WHERE disabled = 0').first<{ n: number }>(),
-    memo('stats-songs', 60000, () => db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM songs').first<{ n: number; bytes: number }>()),
-    memo('job-counts', 30000, () => db.prepare('SELECT status, COUNT(*) AS n FROM download_jobs GROUP BY status').all<{ status: string; n: number }>()),
-    db.prepare("SELECT COUNT(*) AS n FROM plays WHERE played_at >= date('now', '-7 days')").first<{ n: number }>(),
+    memo('stats-songs', 60000, () => db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM songs').first<{ n: number; bytes: number }>(), { shared: true }),
+    memo('job-counts', 30000, () => db.prepare('SELECT status, COUNT(*) AS n FROM download_jobs GROUP BY status').all<{ status: string; n: number }>(), { shared: true }),
+    memo('plays-7d', 5 * 60000, () => db.prepare("SELECT COUNT(*) AS n FROM plays WHERE played_at >= date('now', '-7 days')").first<{ n: number }>(), { shared: true }),
     db.prepare('SELECT * FROM agent_heartbeats ORDER BY last_seen_at DESC LIMIT 1').first<{
       agent_id: string
       last_seen_at: string

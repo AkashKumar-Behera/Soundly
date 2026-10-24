@@ -43,7 +43,7 @@ artistPages.get('/', async (c) => {
        FROM artists a JOIN songs s ON s.artist_id = a.id
        GROUP BY a.id ORDER BY songCount DESC, a.name`,
     )
-    .all<{ id: string; name: string; browseId: string | null; imageUrl: string | null; checked: string | null; songCount: number }>())
+    .all<{ id: string; name: string; browseId: string | null; imageUrl: string | null; checked: string | null; songCount: number }>(), { shared: true })
 
   const todo = results.filter((a) => !a.checked && a.name !== 'Unknown Artist').slice(0, 8)
   await Promise.all(

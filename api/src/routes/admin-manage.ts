@@ -89,6 +89,7 @@ adminManage.get('/songs', async (c) => {
   // Totals for the filter chips, kept for a minute (a finished download clears them).
   const counts = await memo('stats-songs-formats', 60000, () =>
     c.env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(r2_key LIKE '%.m4a'), 0) AS aac FROM songs").first<{ n: number; aac: number }>(),
+    { shared: true },
   )
   return c.json({ songs: results, total: counts?.n ?? 0, aacCount: counts?.aac ?? 0, mp3Count: (counts?.n ?? 0) - (counts?.aac ?? 0), limit, offset })
 })

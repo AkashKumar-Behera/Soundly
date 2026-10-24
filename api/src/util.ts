@@ -49,16 +49,50 @@ export function parseRange(header: string | null, size: number): { start: number
 }
 
 const memoStore = new Map<string, { at: number; value: unknown }>()
+const sharedUrl = (key: string) => `https://memo.local/${encodeURIComponent(key)}`
 
-/** Remembers an expensive result for `ttlMs` (per Worker instance). Saves D1 row reads on hot, slow-changing numbers. */
-export async function memo<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+/**
+ * Remembers an expensive result for `ttlMs`. In memory per Worker instance, and with `shared` also in Cloudflare's
+ * cache (one copy for every instance in the data centre), so a busy day does not recompute it on each instance.
+ * This saves D1 row reads on hot, slow-changing numbers.
+ */
+export async function memo<T>(key: string, ttlMs: number, load: () => Promise<T>, opts: { shared?: boolean } = {}): Promise<T> {
   const hit = memoStore.get(key)
   if (hit && Date.now() - hit.at < ttlMs) return hit.value as T
+
+  const cache = opts.shared && typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default : undefined
+  if (cache) {
+    try {
+      const res = await cache.match(sharedUrl(key))
+      if (res) {
+        const value = (await res.json()) as T
+        memoStore.set(key, { at: Date.now(), value })
+        return value
+      }
+    } catch {
+      // the shared cache is a bonus; fall through to the database
+    }
+  }
+
   const value = await load()
   memoStore.set(key, { at: Date.now(), value })
+  if (cache) {
+    try {
+      await cache.put(sharedUrl(key), new Response(JSON.stringify(value), { headers: { 'Cache-Control': `max-age=${Math.max(1, Math.round(ttlMs / 1000))}`, 'Content-Type': 'application/json' } }))
+    } catch {
+      // ignore
+    }
+  }
   return value
 }
 
+/** Forgets cached results whose key starts with `prefix` (and the shared copy of that exact key). */
 export function forget(prefix: string): void {
   for (const k of memoStore.keys()) if (k.startsWith(prefix)) memoStore.delete(k)
+  try {
+    const cache = (caches as unknown as { default?: Cache }).default
+    void cache?.delete(sharedUrl(prefix))
+  } catch {
+    // ignore
+  }
 }
