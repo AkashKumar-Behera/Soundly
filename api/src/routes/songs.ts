@@ -1,5 +1,8 @@
 import { Hono } from 'hono'
 import { requireUser } from '../auth'
+import { createUpgradeJob } from '../lib/jobs'
+import { emit } from '../lib/live'
+import { wakeAgent } from '../lib/wake'
 import type { AppEnv } from '../types'
 import { clampInt, likePattern, memo, parseRange } from '../util'
 
@@ -8,7 +11,7 @@ songs.use('*', requireUser)
 
 export const SONG_SELECT = `
   SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration,
-         s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId,
+         s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId, s.r2_key LIKE '%.m4a' AS aac,
          EXISTS (SELECT 1 FROM likes l WHERE l.user_id = ?1 AND l.song_id = s.id) AS liked
   FROM songs s LEFT JOIN artists a ON a.id = s.artist_id`
 
@@ -20,10 +23,11 @@ export interface SongRow {
   duration: number | null
   hasThumb: number
   youtubeId: string | null
+  aac: number
   liked: number
 }
 
-export const shapeSong = (r: SongRow) => ({ ...r, hasThumb: !!r.hasThumb, liked: !!r.liked })
+export const shapeSong = (r: SongRow) => ({ ...r, hasThumb: !!r.hasThumb, aac: !!r.aac, liked: !!r.liked })
 
 songs.get('/', async (c) => {
   const user = c.get('user')
@@ -43,6 +47,17 @@ songs.get('/', async (c) => {
   )
 
   return c.json({ songs: results.map(shapeSong), limit, offset })
+})
+
+// Ask for the AAC version of a song that is still MP3. Trusted users and admins queue it right away; others need approval.
+songs.post('/:id/upgrade', async (c) => {
+  const user = c.get('user')
+  if (user.role === 'listener') return c.json({ error: 'forbidden' }, 403)
+  const r = await createUpgradeJob(c.env.DB, user, c.req.param('id'))
+  if (!r.ok) return c.json({ error: r.error }, r.error === 'not_found' ? 404 : r.error === 'daily_limit_reached' ? 429 : 409)
+  if (r.status === 'queued') wakeAgent(c.env, c.executionCtx)
+  emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
+  return c.json({ status: r.status })
 })
 
 songs.get('/:id', async (c) => {

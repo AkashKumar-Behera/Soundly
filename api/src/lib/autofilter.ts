@@ -7,7 +7,7 @@ const UNOFFICIAL =
 
 export const isOfficialLooking = (title: string): boolean => !UNOFFICIAL.test(title)
 
-const norm = (s: string): string =>
+export const norm = (s: string): string =>
   s
     .toLowerCase()
     .replace(/\([^)]*\)|\[[^\]]*\]/g, '')

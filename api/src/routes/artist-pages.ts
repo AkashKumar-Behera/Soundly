@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { canRequestDirect, requireUser } from '../auth'
-import { autoAddable } from '../lib/autofilter'
+import { autoAddable, isOfficialLooking, norm as normName } from '../lib/autofilter'
 import { createJob } from '../lib/jobs'
 import { emit } from '../lib/live'
 import { forget, memo } from '../util'
@@ -59,7 +59,20 @@ artistPages.get('/', async (c) => {
       }
     }),
   )
-  return c.json({ artists: results.map(({ checked: _checked, ...a }) => a) })
+  // "ARIJIT SINGH" and "Arijit Singh" are one artist: merge by name, summing the songs.
+  const merged = new Map<string, (typeof results)[number]>()
+  for (const a of results) {
+    const key = normName(a.name)
+    const have = merged.get(key)
+    if (!have) merged.set(key, { ...a })
+    else {
+      have.songCount += a.songCount
+      have.browseId = have.browseId ?? a.browseId
+      have.imageUrl = have.imageUrl ?? a.imageUrl
+    }
+  }
+  const list = [...merged.values()].sort((x, y) => y.songCount - x.songCount || x.name.localeCompare(y.name))
+  return c.json({ artists: list.map(({ checked: _checked, ...a }) => a) })
 })
 
 /** An artist's songs on YouTube Music (up to 100), marked with what is already in the library or queued. */
@@ -67,7 +80,18 @@ artistPages.get('/:browseId/songs', async (c) => {
   const id = c.req.param('browseId')
   if (!/^UC[\w-]{10,40}$/.test(id)) return c.json({ error: 'invalid_request' }, 400)
   try {
-    const songs = await memo(`artist-songs:${id}`, 10 * 60000, async () => (await ytmArtistSongs(id, 100)).slice(0, 100))
+    const songs = await memo(`artist-songs:${id}`, 10 * 60000, async () => {
+      // Official-looking uploads only, one entry per title (YouTube lists clean/explicit/remastered copies separately).
+      const seen = new Set<string>()
+      return (await ytmArtistSongs(id, 200))
+        .filter((t) => {
+          const key = normName(t.title)
+          if (!isOfficialLooking(t.title) || seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        .slice(0, 100)
+    })
     return c.json({ songs: await annotate(c.env.DB, songs) })
   } catch (e) {
     console.error(e)

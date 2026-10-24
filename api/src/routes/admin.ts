@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
 import type { AppEnv } from '../types'
 import { emit, liveProgress } from '../lib/live'
+import { createUpgradeJob } from '../lib/jobs'
 import { queueInfo } from '../lib/queue'
 import { agentStatus, wakeAgent } from '../lib/wake'
 import { audit, forget, getSetting, memo } from '../util'
@@ -70,6 +71,27 @@ admin.delete('/requests/:id', async (c) => {
   if (!res.meta.changes) return c.json({ error: 'not_removable' }, 409)
   await audit(c.env.DB, c.get('user').id, 'request.delete', id)
   return c.json({ ok: true })
+})
+
+// Queue the AAC version of every song that is still MP3 (up to 500 at a time, skipping ones already waiting).
+admin.post('/upgrade-aac', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT s.id FROM songs s
+     WHERE s.r2_key NOT LIKE '%.m4a' AND s.youtube_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM download_jobs j WHERE j.youtube_id = s.youtube_id AND j.status IN ('pending_approval','queued','downloading','uploading'))
+     ORDER BY s.created_at DESC LIMIT 500`,
+  ).all<{ id: string }>()
+  let queued = 0
+  for (const row of results) {
+    const r = await createUpgradeJob(c.env.DB, c.get('user'), row.id, { skipDailyLimit: true, forceQueue: true })
+    if (r.ok) queued += 1
+  }
+  if (queued) {
+    wakeAgent(c.env, c.executionCtx)
+    emit(c.env, c.executionCtx, { type: 'hint', topic: 'requests' })
+  }
+  await audit(c.env.DB, c.get('user').id, 'songs.upgrade_aac', 'all', { queued })
+  return c.json({ queued })
 })
 
 admin.post('/requests/:id/retry', async (c) => {

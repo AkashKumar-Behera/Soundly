@@ -71,3 +71,36 @@ export async function createJob(db: D1Database, user: User, input: JobInput, opt
   }
   return { ok: true, id, status, flags }
 }
+
+export type UpgradeResult = { ok: true; status: 'queued' | 'pending_approval' } | { ok: false; error: 'not_found' | 'already_aac' | 'already_requested' | 'daily_limit_reached' | 'no_source' }
+
+/** Queues a fresh download of a song that is already in the library, to replace its MP3 with AAC. */
+export async function createUpgradeJob(db: D1Database, user: User, songId: string, opts: { skipDailyLimit?: boolean; forceQueue?: boolean } = {}): Promise<UpgradeResult> {
+  const song = await db
+    .prepare('SELECT s.id, s.title, s.youtube_id AS yid, s.duration_sec AS dur, s.r2_key AS key, a.name AS artist FROM songs s LEFT JOIN artists a ON a.id = s.artist_id WHERE s.id = ?')
+    .bind(songId)
+    .first<{ id: string; title: string; yid: string | null; dur: number | null; key: string; artist: string | null }>()
+  if (!song) return { ok: false, error: 'not_found' }
+  if (song.key.endsWith('.m4a')) return { ok: false, error: 'already_aac' }
+  if (!song.yid || !YT_ID.test(song.yid)) return { ok: false, error: 'no_source' }
+
+  if (!opts.skipDailyLimit && user.role !== 'admin') {
+    const used = await db.prepare("SELECT COUNT(*) AS n FROM download_jobs WHERE user_id = ? AND created_at >= date('now')").bind(user.id).first<{ n: number }>()
+    if ((used?.n ?? 0) >= user.daily_request_limit) return { ok: false, error: 'daily_limit_reached' }
+  }
+
+  const status = opts.forceQueue || canRequestDirect(user) ? 'queued' : 'pending_approval'
+  try {
+    await db
+      .prepare(
+        `INSERT INTO download_jobs (id, user_id, youtube_id, youtube_url, title, channel, duration_sec, category, flags, status, replace_song_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Music', '[]', ?, ?)`,
+      )
+      .bind(crypto.randomUUID(), user.id, song.yid, `https://www.youtube.com/watch?v=${song.yid}`, song.title, song.artist, song.dur, status, song.id)
+      .run()
+  } catch (e) {
+    if (String(e).includes('UNIQUE')) return { ok: false, error: 'already_requested' }
+    throw e
+  }
+  return { ok: true, status }
+}

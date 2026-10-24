@@ -59,7 +59,7 @@ playlists.get('/:id', async (c) => {
 
   const { results } = await c.env.DB.prepare(
     `SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration,
-            s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId,
+            s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId, s.r2_key LIKE '%.m4a' AS aac,
             EXISTS (SELECT 1 FROM likes l WHERE l.user_id = ?2 AND l.song_id = s.id) AS liked
      FROM playlist_songs ps JOIN songs s ON s.id = ps.song_id LEFT JOIN artists a ON a.id = s.artist_id
      WHERE ps.playlist_id = ?1 ORDER BY ps.position, ps.added_at`,

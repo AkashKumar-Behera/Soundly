@@ -32,7 +32,7 @@ likes.use('*', requireUser)
 likes.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration,
-            s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId, 1 AS liked
+            s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId, s.r2_key LIKE '%.m4a' AS aac, 1 AS liked
      FROM likes l JOIN songs s ON s.id = l.song_id LEFT JOIN artists a ON a.id = s.artist_id
      WHERE l.user_id = ? ORDER BY l.created_at DESC`,
   )
@@ -73,7 +73,7 @@ plays.post('/', async (c) => {
 plays.get('/recent', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration,
-            s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId,
+            s.thumb_key IS NOT NULL AS hasThumb, s.youtube_id AS youtubeId, s.r2_key LIKE '%.m4a' AS aac,
             EXISTS (SELECT 1 FROM likes l WHERE l.user_id = ?1 AND l.song_id = s.id) AS liked
      FROM (SELECT song_id, MAX(played_at) AS last_played FROM plays WHERE user_id = ?1 GROUP BY song_id) r
      JOIN songs s ON s.id = r.song_id LEFT JOIN artists a ON a.id = s.artist_id

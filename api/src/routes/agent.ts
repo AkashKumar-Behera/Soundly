@@ -106,15 +106,32 @@ agent.post('/jobs/:id/complete', async (c) => {
   const db = c.env.DB
 
   const job = await db
-    .prepare("SELECT id, youtube_id, title, channel, user_id FROM download_jobs WHERE id = ? AND status IN ('downloading', 'uploading')")
+    .prepare("SELECT id, youtube_id, title, channel, user_id, replace_song_id FROM download_jobs WHERE id = ? AND status IN ('downloading', 'uploading')")
     .bind(id)
-    .first<{ id: string; youtube_id: string; title: string; channel: string | null; user_id: string }>()
+    .first<{ id: string; youtube_id: string; title: string; channel: string | null; user_id: string; replace_song_id: string | null }>()
   if (!job) return c.json({ error: 'job_not_active' }, 409)
 
   const r2Key = body.r2Key ?? ''
   if (!KEY.test(r2Key) || !r2Key.startsWith('songs/')) return c.json({ error: 'invalid_key' }, 400)
   if (!(await c.env.SONGS.head(r2Key))) return c.json({ error: 'audio_not_uploaded' }, 400)
   const thumbKey = body.thumbKey && KEY.test(body.thumbKey) && body.thumbKey.startsWith('thumbs/') ? body.thumbKey : null
+
+  if (job.replace_song_id) {
+    // AAC upgrade: same song id (likes, playlists and history stay), new audio file; the old one is removed.
+    const old = await db.prepare('SELECT r2_key FROM songs WHERE id = ?').bind(job.replace_song_id).first<{ r2_key: string }>()
+    await db.batch([
+      db
+        .prepare('UPDATE songs SET r2_key = ?, thumb_key = COALESCE(?, thumb_key), size_bytes = ?, bitrate_kbps = ? WHERE id = ?')
+        .bind(r2Key, thumbKey, Number.isFinite(body.sizeBytes) ? Math.floor(body.sizeBytes as number) : null, Number.isFinite(body.bitrateKbps) ? Math.floor(body.bitrateKbps as number) : null, job.replace_song_id),
+      db.prepare("UPDATE download_jobs SET status = 'done', song_id = ?, error = NULL, stage = NULL, progress = 1, eta_sec = NULL, speed_bps = NULL, updated_at = datetime('now') WHERE id = ?").bind(job.replace_song_id, id),
+    ])
+    if (old && old.r2_key !== r2Key) await c.env.SONGS.delete(old.r2_key)
+    forget('songs:')
+    forget('stats-songs')
+    emit(c.env, c.executionCtx, { type: 'job', id, status: 'done', songId: job.replace_song_id })
+    emit(c.env, c.executionCtx, { type: 'hint', topic: 'library' })
+    return c.json({ songId: job.replace_song_id })
+  }
 
   const songId = crypto.randomUUID()
   const artist = (body.artist ?? job.channel ?? 'Unknown Artist').replace(/ - Topic$/, '').trim().slice(0, 120) || 'Unknown Artist'

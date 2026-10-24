@@ -254,9 +254,23 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 }))
 
+const warm = new Audio()
+warm.preload = 'auto'
+warm.muted = true
+let warmed = ''
+function warmNext() {
+  const { queue, index, shuffle, repeat } = usePlayer.getState()
+  const next = queue[index + 1]
+  if (!next || shuffle || repeat === 'one' || warmed === next.id || !navigator.onLine) return
+  warmed = next.id
+  warm.src = next.src
+  warm.load()
+}
+
 let lastPosition = 0
 audio.addEventListener('timeupdate', () => {
   usePlayer.setState({ time: audio.currentTime })
+  if (audio.duration > 0 && audio.currentTime / audio.duration > 0.4) warmNext()
   const now = Date.now()
   if (now - lastPosition > 1000 && 'mediaSession' in navigator && Number.isFinite(audio.duration) && audio.duration > 0) {
     lastPosition = now
@@ -315,8 +329,14 @@ if ('mediaSession' in navigator) {
   ms.setActionHandler('seekto', (d) => {
     if (d.seekTime != null) usePlayer.getState().seek(d.seekTime)
   })
-  ms.setActionHandler('seekbackward', (d) => usePlayer.getState().seek(Math.max(0, audio.currentTime - (d.seekOffset ?? 10))))
-  ms.setActionHandler('seekforward', (d) => usePlayer.getState().seek(Math.min(audio.duration || Infinity, audio.currentTime + (d.seekOffset ?? 10))))
+  // No handlers for seekbackward/seekforward: with them, iPhones replace Previous/Next with +-10 second buttons.
+  for (const action of ['seekbackward', 'seekforward'] as const) {
+    try {
+      ms.setActionHandler(action, null)
+    } catch {
+      // not supported here
+    }
+  }
 }
 
 export const useCurrent = (): Song | undefined => usePlayer((s) => s.queue[s.index] as Song | undefined)
