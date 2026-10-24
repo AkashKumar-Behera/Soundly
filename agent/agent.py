@@ -36,7 +36,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.8.0'
+VERSION = '0.8.1'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -602,6 +602,17 @@ def run_job(api: Api, cfg: dict, state: State, job: dict) -> None:
 
 
 def worker(n: int, cfg: dict, state: State, wake: Wake, stop: threading.Event, once: bool) -> None:
+    """Keeps a download slot alive: if anything unexpected escapes, log it and start over instead of dying silently."""
+    while not stop.is_set():
+        try:
+            _worker(n, cfg, state, wake, stop, once)
+            return
+        except Exception:  # noqa: BLE001
+            log.exception('slot %d crashed, restarting it', n)
+            stop.wait(5)
+
+
+def _worker(n: int, cfg: dict, state: State, wake: Wake, stop: threading.Event, once: bool) -> None:
     """One download slot: claim a job, process it, repeat. Several of these run side by side."""
     api = Api(cfg)  # own HTTP session per slot
     backoff = cfg['poll_seconds']
