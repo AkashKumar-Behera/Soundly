@@ -743,3 +743,110 @@ a,
   font-weight: 800;
   box-shadow: 0 10px 40px color-mix(in srgb, var(--accent) 50%, transparent);
 }
+
+/* ---------- Phones turned sideways: left side the cover, right side the controls ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Now Playing, every style */
+  .np-inner {
+    padding: calc(8px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left));
+  }
+  .np-head {
+    position: absolute;
+    top: calc(6px + env(safe-area-inset-top));
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    z-index: 2;
+  }
+  .np-head span {
+    display: none;
+  }
+  .np-body {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 28px;
+    height: 100%;
+    padding-top: 0;
+    align-items: center;
+  }
+  .np-main {
+    display: contents;
+  }
+  .np-art,
+  .vinyl {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    width: min(100%, 76dvh);
+    justify-self: center;
+  }
+  .np-meta,
+  .np-seek,
+  .np-controls {
+    grid-column: 2;
+  }
+  .np-side {
+    display: none;
+  }
+
+  /* Modern: cover and title on the left, controls on the right */
+  .np-inner.ps-modern {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    grid-template-areas: 'stage controls';
+    gap: 24px;
+    align-items: center;
+    padding: calc(8px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) 12px calc(24px + env(safe-area-inset-left));
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+  .np-inner.ps-modern > * {
+    width: auto;
+    margin-inline: 0;
+  }
+  .md-head {
+    position: absolute;
+    top: calc(6px + env(safe-area-inset-top));
+    left: calc(14px + env(safe-area-inset-left));
+    right: calc(14px + env(safe-area-inset-right));
+    z-index: 3;
+  }
+  .md-stage,
+  .md-panel {
+    grid-area: stage;
+    margin: 0;
+    height: 100%;
+    max-height: calc(100dvh - 24px);
+  }
+  .md-art {
+    width: min(100%, 62dvh);
+    margin-bottom: 8px;
+  }
+  .md-title {
+    font-size: 1.15rem;
+  }
+  .md-artist {
+    font-size: 0.95rem;
+  }
+  .md-controls {
+    grid-area: controls;
+    gap: 10px;
+    align-self: center;
+  }
+
+  /* The app around it: a slim bar at the bottom */
+  .mobile-nav {
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+  }
+  .tab {
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 4px;
+    font-size: 0.8rem;
+  }
+  .main {
+    padding-bottom: 110px;
+  }
+  .offline-screen {
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
+  }
+}

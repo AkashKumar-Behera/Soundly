@@ -10,14 +10,13 @@ import { Cover } from './Cover'
 import { Lyrics, Queue } from './NpPanels'
 import { CurrentTime, TotalTime } from './ProgressBar'
 
-const AMP = 4
+const AMP = 0 // a plain straight bar
 const WAVE = 18
 
 /** A progress bar whose played part is a gently moving wave. Tap or drag to seek. */
 function WavyProgress() {
   const time = usePlayer((s) => s.time)
   const duration = usePlayer((s) => s.duration)
-  const playing = usePlayer((s) => s.playing)
   const ref = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(300)
   const [drag, setDrag] = useState<number | null>(null)
@@ -72,7 +71,7 @@ function WavyProgress() {
         </defs>
         <line x1={x} y1={mid} x2={width} y2={mid} className="wavy-rest" />
         <g clipPath="url(#wavy-clip)">
-          <path d={d} className={`wavy-line ${playing ? 'run' : ''}`} />
+          <path d={d} className="wavy-line" />
         </g>
         <rect x={Math.max(0, x - 2)} y="3" width="4" height="22" rx="2" className="wavy-thumb" />
       </svg>
