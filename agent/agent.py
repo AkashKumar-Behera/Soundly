@@ -36,7 +36,7 @@ try:
 except ImportError:  # push is optional; polling still works
     websocket = None
 
-VERSION = '0.7.0'
+VERSION = '0.7.1'
 HERE = Path(__file__).resolve().parent
 log = logging.getLogger('soundly-agent')
 
@@ -541,9 +541,9 @@ def worker(n: int, cfg: dict, state: State, wake: Wake, stop: threading.Event, o
             job = api.claim()
             backoff = cfg['poll_seconds']
         except requests.RequestException as e:
-            backoff = min(backoff * 2, 300)
+            backoff = min(backoff * 2, 60)
             log.warning('slot %d cannot reach API (%s), retrying in %ss', n, e, backoff)
-            stop.wait(backoff)
+            wake.wait(backoff, seen)  # a push from the server cuts the wait short
             continue
 
         if job is None:
