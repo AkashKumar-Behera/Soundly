@@ -45,6 +45,16 @@ const STALE_MS = 3 * 60 * 1000
  */
 export class AgentHub extends DurableObject<Env> {
   private progress = new Map<string, Progress>()
+  /** Recent messages per app connection, so one that goes wrong is cut off instead of using up the daily allowance. */
+  private recent = new WeakMap<WebSocket, number[]>()
+
+  private tooBusy(ws: WebSocket, max: number): boolean {
+    const now = Date.now()
+    const list = (this.recent.get(ws) ?? []).filter((t) => now - t < 10000)
+    list.push(now)
+    this.recent.set(ws, list)
+    return list.length > max
+  }
 
   async fetch(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname
@@ -141,6 +151,7 @@ export class AgentHub extends DurableObject<Env> {
 
   /** Messages from an app: it introduces itself, shares what it is playing, and sends commands to its other devices. */
   private async handleClient(ws: WebSocket, userTag: string, message: string): Promise<void> {
+    if (this.tooBusy(ws, 40)) return // more than 40 messages in 10 seconds is not a person; ignore the excess
     let msg: { type?: string; id?: string; name?: string; kind?: string; state?: unknown; to?: string; cmd?: string; payload?: unknown }
     try {
       msg = JSON.parse(message)

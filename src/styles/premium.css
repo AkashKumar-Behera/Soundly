@@ -1423,3 +1423,12 @@ a,
   background: var(--accent);
   transition: width 1s linear;
 }
+.dev-synced {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--accent);
+}

@@ -162,6 +162,7 @@ type Cmd = { type: 'cmd'; from: string; cmd: string; payload: unknown }
 
 /** Commands that arrive from the partner must not be echoed back to it. */
 let quietUntil = 0
+let playTimer: ReturnType<typeof setTimeout> | undefined
 
 function handle(e: Cmd) {
   quietUntil = Date.now() + 1800
@@ -171,6 +172,15 @@ function handle(e: Cmd) {
     case 'play': {
       const songs = payload.songs as Song[] | undefined
       if (!songs?.length) return
+      const want = songs[Number(payload.index) || 0]
+      const at0 = Number(payload.position) || 0
+      if (want && p.queue[p.index]?.id === want.id) {
+        // Already on this song: only line up the position and the play/pause state, never restart it.
+        if (Math.abs(p.time - at0) > 3) p.seek(at0)
+        if (typeof payload.playing === 'boolean' && payload.playing !== p.playing) p.toggle()
+        useConnect.setState({ remoteId: null })
+        break
+      }
       // Songs sent over the wire keep their ids; rebuild the stream and cover links for this device.
       p.playQueue(songs.map((s) => ({ ...s, src: useLibrary.getState().songs.find((x) => x.id === s.id)?.src ?? s.src })), Number(payload.index) || 0)
       const at = Number(payload.position) || 0
@@ -247,7 +257,18 @@ export function startConnect() {
       const from = Math.max(0, s.index - 1)
       sendLive({ type: 'cmd', to: link, cmd: 'play', payload: { songs: s.queue.slice(from, from + 40), index: s.index - from, position: 0, playing: s.playing } })
     } else if (s.playing !== prev.playing) {
-      sendLive({ type: 'cmd', to: link, cmd: 'setPlaying', payload: { playing: s.playing } })
+      // Brief pauses are not the user's doing: a song ending, the network stalling, a call interrupting. Only a pause or
+      // play that is still true a moment later, and not at the very end of a song, is passed on.
+      const want = s.playing
+      const nearEnd = s.duration > 0 && s.duration - s.time < 2.5
+      if (!nearEnd) {
+        clearTimeout(playTimer)
+        playTimer = setTimeout(() => {
+          const now = usePlayer.getState()
+          const link2 = useConnect.getState().linkedId
+          if (link2 && now.playing === want && Date.now() >= quietUntil) sendLive({ type: 'cmd', to: link2, cmd: 'setPlaying', payload: { playing: want } })
+        }, 700)
+      }
     } else if (Math.abs(s.time - prev.time) > 3 && a?.id === b?.id) {
       sendLive({ type: 'cmd', to: link, cmd: 'seek', payload: { position: s.time } })
     }

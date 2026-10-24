@@ -93,6 +93,9 @@ export function DevicesSheet() {
   const setName = useConnect((s) => s.setName)
   const current = useCurrent()
   const playing = usePlayer((s) => s.playing)
+  const linkedId = useConnect((s) => s.linkedId)
+  const toggleSync = useConnect((s) => s.toggleSync)
+  const all = useConnect((s) => s.devices)
   const time = usePlayer((s) => s.time)
   const duration = usePlayer((s) => s.duration)
   const [editing, setEditing] = useState<string | null>(null)
@@ -137,6 +140,14 @@ export function DevicesSheet() {
               <i className="dot on" />
               <span>Online · this device</span>
             </div>
+            {linkedId && (
+              <div className="dev-synced">
+                <span>Synced with {all.find((d) => d.id === linkedId)?.name ?? 'another device'}</span>
+                <button className="link-btn" onClick={() => toggleSync(linkedId)}>
+                  Stop syncing
+                </button>
+              </div>
+            )}
             <div className="truncate muted">{current ? `${playing ? 'Playing' : 'Paused'} · ${current.title}` : 'Nothing playing'}</div>
             {current && duration > 0 && (
               <div className="dev-prog">
