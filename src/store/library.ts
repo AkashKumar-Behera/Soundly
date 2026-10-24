@@ -43,6 +43,8 @@ export interface SongRequest {
   flags: string[]
   status: RequestStatus
   rejectReason: string | null
+  /** The library song, once the download is done. */
+  songId?: string | null
   stage: string | null
   progress: number | null
   etaSec: number | null

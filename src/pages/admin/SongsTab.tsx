@@ -1,6 +1,7 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, thumbUrl } from '../../api/client'
+import { AacBadge } from '../../components/AacBadge'
 import { Cover } from '../../components/Cover'
 import { hueFromId } from '../../store/library'
 import { useUi } from '../../store/ui'
@@ -16,6 +17,7 @@ interface AdminSong {
   youtubeId: string | null
   createdAt: string
   hasThumb: number
+  aac: number
   addedBy: string | null
   plays: number
   likes: number
@@ -24,7 +26,8 @@ interface AdminSong {
 export function SongsTab() {
   const showToast = useUi((s) => s.showToast)
   const [q, setQ] = useState('')
-  const [data, setData] = useState<{ songs: AdminSong[]; total: number } | null>(null)
+  const [data, setData] = useState<{ songs: AdminSong[]; total: number; aacCount: number; mp3Count: number } | null>(null)
+  const [format, setFormat] = useState<'' | 'aac' | 'mp3'>('')
   const [limit, setLimit] = useState(50)
   const [version, setVersion] = useState(0)
   const [deleting, setDeleting] = useState<AdminSong | null>(null)
@@ -35,7 +38,7 @@ export function SongsTab() {
   useEffect(() => {
     let live = true
     const t = setTimeout(() => {
-      api<{ songs: AdminSong[]; total: number }>(`/admin/songs?q=${encodeURIComponent(q)}&limit=${limit}`)
+      api<{ songs: AdminSong[]; total: number; aacCount: number; mp3Count: number }>(`/admin/songs?q=${encodeURIComponent(q)}&limit=${limit}&format=${format}`)
         .then((d) => live && setData(d))
         .catch(() => {})
     }, 250)
@@ -43,7 +46,7 @@ export function SongsTab() {
       live = false
       clearTimeout(t)
     }
-  }, [q, limit, version])
+  }, [q, limit, version, format])
 
   const reload = () => setVersion((v) => v + 1)
 
@@ -93,6 +96,14 @@ export function SongsTab() {
         </button>
       </div>
 
+      <div className="chips">
+        {([['', 'All', data?.total], ['aac', 'AAC', data?.aacCount], ['mp3', 'MP3', data?.mp3Count]] as const).map(([id, label, n]) => (
+          <button key={id} className={`chip ${format === id ? 'on' : ''}`} onClick={() => setFormat(id)}>
+            {label} <span className="count">{n ?? ''}</span>
+          </button>
+        ))}
+      </div>
+
       {data && !data.songs.length && <p className="muted empty">No songs found.</p>}
 
       <div className="rows">
@@ -100,7 +111,10 @@ export function SongsTab() {
           <div key={s.id} className="row">
             <Cover hue={hueFromId(s.id)} size={48} className="r8" thumbUrl={s.hasThumb ? thumbUrl(s.id) : undefined} />
             <div className="min0 grow">
-              <div className="truncate strong">{s.title}</div>
+              <div className="truncate strong">
+                <AacBadge song={{ aac: !!s.aac }} />
+                {s.title}
+              </div>
               <div className="truncate muted">
                 {s.artist ?? 'Unknown'} · {s.album ?? 'Single'} · added {timeAgo(s.createdAt)}
                 {s.addedBy ? ` by ${s.addedBy}` : ''}

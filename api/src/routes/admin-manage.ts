@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { requireAdmin, requireUser } from '../auth'
 import type { AppEnv } from '../types'
-import { audit, clampInt, likePattern } from '../util'
+import { audit, clampInt, likePattern, memo } from '../util'
 
 /** Library, analytics, settings and activity management for the admin panel (complements routes/admin.ts). */
 export const adminManage = new Hono<AppEnv>()
@@ -72,19 +72,25 @@ adminManage.get('/songs', async (c) => {
   const limit = clampInt(c.req.query('limit'), 50, 1, 200)
   const offset = clampInt(c.req.query('offset'), 0, 0, 100000)
   const pattern = likePattern(q)
+  // Optional filter: only AAC (.m4a) songs, or only the older MP3 ones.
+  const format = c.req.query('format') === 'aac' ? 'aac' : c.req.query('format') === 'mp3' ? 'mp3' : ''
   const { results } = await c.env.DB.prepare(
-    `SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration, s.size_bytes AS sizeBytes, s.youtube_id AS youtubeId,
+    `SELECT s.id, s.title, a.name AS artist, s.album, s.duration_sec AS duration, s.size_bytes AS sizeBytes, s.youtube_id AS youtubeId, s.r2_key LIKE '%.m4a' AS aac,
             s.created_at AS createdAt, s.thumb_key IS NOT NULL AS hasThumb, u.name AS addedBy,
             (SELECT COUNT(*) FROM plays p WHERE p.song_id = s.id) AS plays,
             (SELECT COUNT(*) FROM likes l WHERE l.song_id = s.id) AS likes
      FROM songs s LEFT JOIN artists a ON a.id = s.artist_id LEFT JOIN users u ON u.id = s.added_by
      WHERE (?1 = '' OR s.title LIKE ?2 ESCAPE '\\' OR a.name LIKE ?2 ESCAPE '\\' OR s.album LIKE ?2 ESCAPE '\\')
+       AND (?5 = '' OR (?5 = 'aac' AND s.r2_key LIKE '%.m4a') OR (?5 = 'mp3' AND s.r2_key NOT LIKE '%.m4a'))
      ORDER BY s.created_at DESC, s.title LIMIT ?3 OFFSET ?4`,
   )
-    .bind(q, pattern, limit, offset)
+    .bind(q, pattern, limit, offset, format)
     .all()
-  const total = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM songs').first<{ n: number }>()
-  return c.json({ songs: results, total: total?.n ?? 0, limit, offset })
+  // Totals for the filter chips, kept for a minute (a finished download clears them).
+  const counts = await memo('stats-songs-formats', 60000, () =>
+    c.env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(r2_key LIKE '%.m4a'), 0) AS aac FROM songs").first<{ n: number; aac: number }>(),
+  )
+  return c.json({ songs: results, total: counts?.n ?? 0, aacCount: counts?.aac ?? 0, mp3Count: (counts?.n ?? 0) - (counts?.aac ?? 0), limit, offset })
 })
 
 adminManage.patch('/songs/:id', async (c) => {

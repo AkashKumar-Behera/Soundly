@@ -1,7 +1,8 @@
-import { Check, X } from 'lucide-react'
+import { Check, X, Play } from 'lucide-react'
 import { useEffect } from 'react'
 import { RequestProgress, YtThumb } from '../components/RequestProgress'
 import { useLiveReload } from '../lib/live'
+import { playSongById } from '../lib/playById'
 import { useLibrary, useRole } from '../store/library'
 import type { RequestStatus } from '../store/library'
 
@@ -43,7 +44,7 @@ export function Requests() {
 
       <div className="yt-list">
         {requests.map((r) => (
-          <div key={r.id} className="yt-item">
+          <div key={r.id} className={`yt-item ${r.status === 'done' && r.songId ? 'playable' : ''}`} onClick={r.status === 'done' && r.songId ? () => void playSongById(r.songId as string) : undefined}>
             <YtThumb youtubeId={r.youtubeId} />
             <div className="min0">
               <div className="truncate yt-t">{r.title}</div>
@@ -57,7 +58,19 @@ export function Requests() {
               </div>
               <RequestProgress job={r} />
             </div>
-            <span className={`status ${r.status}`}>{label[r.status]}</span>
+            {r.status === 'done' && r.songId ? (
+              <button
+                className="btn-pill"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void playSongById(r.songId as string)
+                }}
+              >
+                <Play size={16} fill="currentColor" /> Play
+              </button>
+            ) : (
+              <span className={`status ${r.status}`}>{label[r.status]}</span>
+            )}
             {role === 'admin' && r.status === 'pending_approval' && (
               <div className="admin-actions">
                 <button className="icon-btn ok" aria-label="Approve" onClick={() => void decide(r.id, 'approve')}>
